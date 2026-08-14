@@ -1,0 +1,132 @@
+/* The eight display faces palette.js rotates through, bundled as local
+   .woff2 files instead of hoping the visitor's OS has Georgia / Tahoma /
+   Segoe Script / Constantia / Palatino Linotype / Cambria / Comic Sans MS
+   installed. Those are Microsoft/Linotype fonts, licensed for use on the
+   systems that ship them and not redistributable as webfonts, so each slot
+   instead bundles the open-licensed face closest to it in character:
+
+     Georgia            -> Gelasio        (metric-compatible with Georgia)
+     Tahoma             -> Open Sans
+     Segoe Script       -> Caveat
+     Constantia         -> Source Serif 4
+     Palatino Linotype  -> EB Garamond
+     Cambria            -> Caladea        (metric-compatible with Cambria)
+     Comic Sans MS      -> Comic Neue
+
+   All seven are SIL OFL 1.1 - see OFL.txt and README.md in this folder.
+
+   Each src: lists the bundled file first and the original OS font second,
+   as local(). That ordering is the whole fallback story for this project:
+   palette.js can only hand p5 a single family name (textFont() double-
+   quotes whatever it gets, so a CSS stack there resolves to nothing and
+   silently renders as the default font), so the "try the nice one, then
+   the OS one" chain has to live here instead. A machine that fails to
+   fetch the .woff2 but does have Georgia or Cambria installed still gets
+   the font the Processing original asked for. local() names full font
+   names, not families, which is why the bold slots can name e.g.
+   'Georgia Bold' - something a font-family list could never resolve.
+
+   These are the *latin* subsets from Google Fonts, which is exactly the
+   coverage the sketch can produce: sketch.js's keyPressed() only accepts
+   characters in the ASCII 32..126 range, and the background emoji never
+   come through this pipeline at all (emojiGrid.js draws them through the
+   raw 2D context using the OS emoji font). The unicode-range descriptors
+   are kept anyway so that anything outside latin - were it ever to reach
+   text() - falls through to the browser's default font rather than
+   rendering as tofu.
+
+   font-display: swap matters only for index.html's start overlay, the one
+   piece of DOM text using these. Canvas ignores font-display entirely: it
+   silently draws in the default font until the webfont is loaded, which is
+   why typingBuffer.js's preloadFonts() waits on these and re-runs the
+   layout once they land. */
+
+/* Georgia's slot, and the only face used at two weights - hence one file
+   listed twice. gelasio.woff2 is a variable font covering wght 400-700,
+   so each @font-face pins it to the one weight that rule provides. */
+@font-face {
+  font-family: 'Gelasio';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(gelasio.woff2) format('woff2'),
+       local('Georgia');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Gelasio';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(gelasio.woff2) format('woff2'),
+       local('Georgia Bold');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Tahoma's slot. */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(open-sans-700.woff2) format('woff2'),
+       local('Tahoma Bold'), local('Tahoma');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Segoe Script's slot. */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(caveat-400.woff2) format('woff2'),
+       local('Segoe Script');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Constantia's slot. */
+@font-face {
+  font-family: 'Source Serif 4';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(source-serif-400.woff2) format('woff2'),
+       local('Constantia');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Palatino Linotype's slot. */
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(eb-garamond-400.woff2) format('woff2'),
+       local('Palatino Linotype');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Cambria's slot. */
+@font-face {
+  font-family: 'Caladea';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(caladea-700.woff2) format('woff2'),
+       local('Cambria Bold'), local('Cambria');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Comic Sans MS's slot - the newest of the eight, added to the rotation
+   with the bundled fonts rather than ported from the Processing original. */
+@font-face {
+  font-family: 'Comic Neue';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(comic-neue-700.woff2) format('woff2'),
+       local('Comic Sans MS Bold'), local('Comic Sans MS');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

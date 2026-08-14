@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Alphabet">
+  <title>Alphabet</title>
+
+  <!--
+    A rainbow "A" on the sketch's own near-black canvas (#020701 == bgCol in
+    theme.js), which is what the app looks like the moment you start typing.
+
+    The letter is drawn as three strokes rather than as text, for two
+    reasons. A favicon renders in browser chrome, where the page's
+    @font-face rules don't exist - a <text> element would silently fall back
+    to whatever the OS felt like, so the one thing this icon has to get
+    right would be the one thing left to chance. Outlining a glyph from
+    fonts/ instead would just move the problem, since those faces are
+    OFL-licensed and an outline is still the font. Strokes with round caps
+    also survive 16x16 far better than a real letterform does: no hairline
+    serifs or thin joins to disappear, and the chunky rounded shape reads as
+    friendly rather than typographic, which suits who this is for.
+
+    The gradient walks the same ROYGBIV order as palette.js's `colors`, but
+    brightened - the literal '#0000ff' and '#4B0082' are so close to the
+    background that the bottom of the letter went muddy at tab size.
+  -->
+  <defs>
+    <linearGradient id="rainbow" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#ff2d2d"/>
+      <stop offset="0.2"  stop-color="#ff7f00"/>
+      <stop offset="0.4"  stop-color="#ffe000"/>
+      <stop offset="0.6"  stop-color="#35d94a"/>
+      <stop offset="0.8"  stop-color="#2aa8ff"/>
+      <stop offset="1"    stop-color="#a45cff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="13" fill="#020701"/>
+
+  <g fill="none" stroke="url(#rainbow)" stroke-width="9" stroke-linejoin="round">
+    <!-- Apex and both legs in one stroke, so the peak joins cleanly. -->
+    <path d="M11 51 L32 11 L53 51" stroke-linecap="round"/>
+    <!-- Crossbar stops dead on each leg's centre line (x = 17.8 / 46.2 at
+         y = 38), so butt caps tuck under the legs instead of poking out. -->
+    <path d="M17.8 38 H46.2"/>
+  </g>
+</svg>

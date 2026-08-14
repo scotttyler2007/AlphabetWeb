@@ -350,7 +350,7 @@ const keywordAliases = {
     sneaker: "shoe", trainer: "shoe", cap: "hat", jewel: "gem",
     photo: "camera", watch: "clock", bulb: "lightbulb",
     // -- emotions & face --
-    lol: "laugh", funny: "laugh", mad: "angry", tired: "sleepy", cry: "sad", grin: "smile", friend: "happy",
+    lol: "laugh", funny: "laugh", mad: "angry", tired: "sleepy", cry: "sad", grin: "smile", friend: "smile",
     // -- shapes, fantasy, sports --
     box: "square", zombie: "monster", hoops: "basketball",
     // -- buildings & property --
