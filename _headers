@@ -1,0 +1,18 @@
+# Cache policy, read by Netlify and Cloudflare Pages at deploy time.
+# GitHub Pages ignores this file entirely - see the Caching section in
+# README.md for what to do there instead.
+#
+# "max-age=0, must-revalidate" does NOT mean "don't cache". The browser still
+# stores every file; it just asks whether its copy is still good before using
+# it, and an unchanged file comes back as a 304 with no body at all. For a
+# site this size that costs a few hundred bytes per visit and makes it
+# impossible for a returning visitor to run last week's JavaScript against
+# this week's index.html - which is the failure that actually bites, because
+# the files load as one interdependent set sharing a single global scope.
+#
+# The fonts could reasonably be cached far longer, since a face is only ever
+# replaced by editing fonts.css to point at a new filename. That's left off
+# deliberately: it trades a guarantee for ~190KB of transfer, and this file
+# is here to buy the guarantee.
+/*
+  Cache-Control: public, max-age=0, must-revalidate

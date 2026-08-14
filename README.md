@@ -7,14 +7,23 @@ fanfare. Arrow keys scroll the crayons (up/down) and the emoji keywords (left/ri
 
 ## Running it
 
-Any static file server, from this folder:
+Any static file server, from this folder — but **not** a bare
+`python3 -m http.server`. It sends `Last-Modified` with no `Cache-Control` and no
+`ETag`, so browsers fall back to heuristic freshness (roughly 10% of the file's age)
+and serve `js/*.js` from cache *without asking the server whether it changed*. Edits
+then appear not to take effect, for minutes at a time, with nothing to indicate
+you're looking at a stale file. Use this instead:
 
 ```bash
-python3 -m http.server 8099 --directory .
+python -c "import http.server as h; C=type('C',(h.SimpleHTTPRequestHandler,),{'end_headers':lambda s:(s.send_header('Cache-Control','no-store'), h.SimpleHTTPRequestHandler.end_headers(s))}); h.test(HandlerClass=C, port=8099)"
 ```
 
-Then open `http://loacalhost:8099`. Opening `index.html` directly off the filesystem
+Then open `http://localhost:8099`. Opening `index.html` directly off the filesystem
 will not work — the browser blocks the `js/*.js` loads under `file://`.
+
+If you do get a stale page, a normal reload won't clear it: use Ctrl+Shift+R, or
+tick **Disable cache** in the DevTools Network tab (which applies only while
+DevTools is open).
 
 ## Deploying
 
@@ -25,6 +34,65 @@ license requires travel with the files. `favicon.ico` belongs at the site root,
 where browsers look for it whether or not they read the `<link>` tags. p5.js loads
 from a pinned CDN (`p5@1.11.3`); vendor it locally if you'd rather not depend on
 jsdelivr.
+
+### Caching
+
+Every `js/*.js` file shares one global scope and they load as an interdependent set,
+so a visitor holding a stale copy of one file against fresh copies of the others is
+the failure worth designing against — not just "the update looks old".
+
+`_headers` sets `max-age=0, must-revalidate` on everything, which **Netlify and
+Cloudflare Pages** read at deploy time. That keeps files cached but forces the
+browser to check before using one, so an unchanged file costs a 304 with no body and
+a changed one is picked up on the next load. No per-deploy step, nothing to remember.
+
+**GitHub Pages — which is where this deploys — ignores `_headers`.** It allows no
+header configuration at all and serves its own `Cache-Control` (a short max-age), so
+`index.html` itself can be a few minutes stale after a deploy. That window self-heals
+and can't be shortened; zero staleness isn't reachable there.
+
+What *is* reachable is removing the dangerous half. Without versioning, `index.html`
+and each `js/*.js` expire independently, so a visitor can end up holding a new
+`index.html` and an old `sketch.js` — a mismatched set sharing one global scope,
+which fails far more confusingly than being cleanly a version behind. So every local
+asset URL in `index.html` carries a `?v=` token:
+
+```html
+<script src="js/sketch.js?v=202608140530"></script>
+```
+
+A changed URL is a different cache entry, so whenever the new HTML lands, every file
+it names is fetched fresh together. **Bump the token as part of deploying** — run this
+from the project root before you push:
+
+```bash
+sed -i "s/?v=[0-9][0-9]*/?v=$(date +%Y%m%d%H%M)/g" index.html
+```
+
+(`[0-9][0-9]*` requires at least one digit on purpose — a plain `[0-9]*` also matches
+the bare `?v=` written in `index.html`'s own comments and rewrites those too.)
+
+In PowerShell:
+`(Get-Content index.html -Raw) -replace '\?v=\d+', "?v=$(Get-Date -Format yyyyMMddHHmm)" | Set-Content index.html -NoNewline -Encoding utf8`
+
+A timestamp rather than a counter, so there's no previous value to look up and it
+always moves forward. Forgetting to bump doesn't break anything — it just leaves
+returning visitors on the old files until GitHub's own window lapses, which is the
+behaviour you'd have had anyway.
+
+The p5 `<script>` is deliberately left un-versioned: its CDN URL already pins an
+exact release, so it is immutable by construction. The `.woff2` URLs inside
+`fonts.css` are left alone too — a face is only ever swapped by adding a
+differently-named file, so there's no stale version for them to serve.
+
+The p5 `<script>` is exempt from all of this: its CDN URL pins an exact version, so
+it is immutable by construction and safe to cache forever.
+
+To check what your host actually sends:
+
+```bash
+curl -sI https://your-site.example/js/sketch.js
+```
 
 ## How it's organized
 

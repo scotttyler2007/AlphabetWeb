@@ -30,8 +30,8 @@ const emojiSize = 120;          // render size for background emoji (separate fr
 const emojiAlphaScale = 1.0;   // emoji clear of the text
 const emojiMinAlpha = 0.3;     // emoji underneath the text - lower it to push them further back
 // Seconds per full 0..1 of alpha travel, same convention as emojiFadeSeconds
-// above - so the 1.0 -> 0.3 dip actually takes 0.7 of it, about 0.18s.
-const emojiDimFadeSeconds = 0.25;
+// above - so the 1.0 -> 0.3 dip actually takes 0.7 of whatever this says.
+const emojiDimFadeSeconds = 0.5;
 const emojiMuteTint = 0.75;    // gray fill tint mixed in (helps mute on fonts that respect fill)
 
 // -- sound --
