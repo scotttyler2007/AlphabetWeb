@@ -76,14 +76,30 @@ function updateNoteQueue() {
     }
 }
 
+// Both blips step one semitone per character in the buffer, with nothing
+// bounding them - no ceiling, no wrap back to base. They are the same curve
+// read in opposite directions: typing walks the pitch up as the phrase
+// grows, backspace walks it back down as the phrase shrinks. Only the base
+// pitch and the envelope differ, which is what keeps them recognisable as
+// two separate sounds.
+//
+// Being unbounded is the point, but it does have a far end. freq is
+// base * 2^(n/12), so the typing blip doubles every 12 characters: it passes
+// 2 kHz at 24 characters, 4 kHz at 36, and around 60 it reaches ~16 kHz and
+// starts falling off the top of adult hearing. Past ~70 it crosses the
+// Nyquist limit and the oscillator clamps it to silence. A really long
+// phrase types itself into a whistle and then into nothing. Lower
+// typeSemitonesPerChar to stretch that out.
 function playTypeSound( bufferLen) {
-    const note = bufferLen % 13; // cycles through the octave and starts over, instead of capping
-    const freq = typeBaseFreq * pow( SEMITONE_RATIO, note * typeSemitonesPerChar) + random( -4, 4);
+    const freq = typeBaseFreq * pow( SEMITONE_RATIO, bufferLen * typeSemitonesPerChar) + random( -4, 4);
     blip( freq, 0.001, 0.03, 0.05, 0.25);
 }
 
-function playBackspaceSound( bufferLen) {
-    const freq = min( backspaceBaseFreq * pow( SEMITONE_RATIO, bufferLen * backspaceSemitonesPerChar), backspaceFreqCap) + random( -4, 4);
+// Called with the buffer length *after* the character was popped, so the
+// pitch retraces the steps typing climbed and lands back on
+// backspaceBaseFreq exactly when the buffer empties.
+function playBackspaceSound( bufferLen = 1.0) {
+    const freq = backspaceBaseFreq * pow( SEMITONE_RATIO, bufferLen * backspaceSemitonesPerChar) + random( -4, 4);
     blip( freq, 0.001, 0.02, 0.06, 0.25);
 }
 

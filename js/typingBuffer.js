@@ -30,6 +30,13 @@ let lastFontUsed = -1;
 // Only calls textFont()/textStyle() when the font actually changed since
 // the last draw call - repeatedly re-setting the same font is a real
 // cost when a big burst of emoji or letters disperses at once.
+//
+// fonts[i].family has to be a bare single family name for this to work at
+// all: p5 1.11.3's textFont() double-quotes the string it's given before
+// handing it to the canvas context, so anything list-shaped or already
+// quoted becomes a family name that matches nothing and drops the canvas
+// to its default font - silently, with no warning and no visible error
+// beyond every slot looking the same. palette.js's comment has the rest.
 function useFont(i) {
     if (i !== lastFontUsed) {
         textFont(fonts[i].family);
@@ -46,9 +53,45 @@ function invalidateFontCache() {
     lastFontUsed = -1;
 }
 
+// Pulls the bundled webfonts (../fonts/, declared by fonts/fonts.css) into
+// memory, then re-lays-out whatever is on screen once they arrive.
+//
+// This is needed because canvas text is not the DOM: a browser only
+// downloads an @font-face file when something actually asks for it, and a
+// canvas fillText()/measureText() call is not that something. Left alone,
+// the sketch would draw and *measure* in the next family down the stack -
+// the OS fallback, or the generic serif - and simply never fetch the
+// webfont at all. Asking document.fonts for each face is the fetch
+// trigger.
+//
+// The re-layout matters just as much: textWidth() reports the fallback's
+// advances until the real face lands, so any phrase laid out in that
+// window would keep letter targets measured against the wrong font. Both
+// the cache reset and layoutTyping() below fix that up on arrival.
+// allSettled, not all: one missing file shouldn't strand the other seven,
+// since the palette.js stacks degrade on their own.
+function preloadFonts() {
+    if (!document.fonts) return;  // pre-2016 browser; the stacks fall back on their own
+
+    // The family is quoted because this builds a CSS font shorthand by
+    // hand and some of the names aren't valid unquoted identifiers -
+    // "Source Serif 4" ends in a bare digit, which fails to parse and
+    // would reject the whole load. p5's textFont() quotes for the same
+    // reason; see useFont() below.
+    const faces = fonts.map(f =>
+        document.fonts.load(`${f.bold ? "bold" : "normal"} ${bigSize}px "${f.family}"`)
+    );
+
+    Promise.allSettled(faces).then(() => {
+        invalidateFontCache();
+        layoutTyping();
+    });
+}
+
 function nextFont() {
     font++;
     font %= fonts.length;
+    console.log(fonts[font].family);
 }
 
 // Shared body of "commit one glyph to the typing buffer", factored out
@@ -69,6 +112,7 @@ function flushTyping() {
     for (const c of typing) c.disperse();
     chars.push(...typing);
     typing.length = 0;
+    currentText = "";
 }
 
 // Peels the last letter off the buffer and disperses it - the single-
@@ -120,6 +164,7 @@ function setBufferToWord(word) {
     currentText = display;
     layoutTyping();
     updateMatches();
+    revertMatchVisuals();
     playScrollSound();
 }
 

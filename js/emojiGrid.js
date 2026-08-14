@@ -106,6 +106,16 @@ function pruneEmojiGrids() {
 // fading out while a new one fades in), which is what makes switching
 // keywords - including rapid arrow-key scrolling - a crossfade instead of
 // an abrupt content swap.
+// The opacity a cell should be heading for: dimmed when the sprite's box
+// overlaps a line of the typed phrase, full otherwise. Shared by the
+// per-frame easing in show() and the initial fill in rebuildCells(), so
+// there's one definition of "is this cell behind the text".
+function dimTargetFor( p, s) {
+    return overlapsTypedText( p.x - s.w / 2, p.y - s.h / 2, s.w, s.h)
+        ? emojiMinAlpha
+        : emojiAlphaScale;
+}
+
 class EmojiGrid {
     constructor( emojiSet) {
         this.sprites = buildEmojiSprites( emojiSet);
@@ -124,6 +134,16 @@ class EmojiGrid {
         const uniqueN = this.sprites.length;
         this.cellSprites = new Array( n);
         for ( let i = 0; i < n; i++) this.cellSprites[i] = this.sprites[ i % uniqueN];
+
+        // Each cell's current opacity, eased toward its target every frame by
+        // show(). Seeded AT the target rather than at full brightness: a grid
+        // usually spawns with the matched word already on screen, and starting
+        // these bright would flash every cell behind the text on the first
+        // frame and then dim it - the exact snap this easing exists to remove.
+        // Re-seeding on a resize rebuild snaps too, which is fine: the window
+        // just changed size and every other cached thing re-derives with it.
+        this.cellDim = new Float32Array( n);
+        for ( let i = 0; i < n; i++) this.cellDim[i] = dimTargetFor( gridPositions[i], this.cellSprites[i]);
     }
 
     fadeOut() {
@@ -138,6 +158,11 @@ class EmojiGrid {
         if ( this.alpha < this.alphaTarget) this.alpha = min( this.alpha + step, this.alphaTarget);
         else if ( this.alpha > this.alphaTarget) this.alpha = max( this.alpha - step, this.alphaTarget);
         if ( this.alphaTarget === 0 && this.alpha <= 0.001) this.dead = true;
+
+        // The per-cell dim easing runs off the same frame clock but its own
+        // duration; show() is what actually applies it, since that's where
+        // the overlap test already happens.
+        this.dimStep = dt / ( emojiDimFadeSeconds * 1000.0);
     }
 
     show() {
@@ -154,11 +179,19 @@ class EmojiGrid {
         const ctx = drawingContext;
         const prevAlpha = ctx.globalAlpha;
 
-        // Two opacities, no gradient: a cell is either sitting on the typed
-        // phrase or it isn't. typedTextBoxes (typingBuffer.js) holds one box
-        // per laid-out line, so the test follows the text exactly - it dims
-        // wrapped lines above and below too, and dims nothing at all when
-        // there's nothing typed to read.
+        // Two opacity levels, but a cell crosses between them over time
+        // rather than in one frame. typedTextBoxes (typingBuffer.js) holds one
+        // box per laid-out line, so the test follows the text exactly - it
+        // dims wrapped lines above and below too, and dims nothing at all when
+        // there's nothing typed to read. What the easing buys is what happens
+        // while someone is actually typing: every keystroke re-wraps the
+        // phrase and moves those boxes, so cells cross the edge of the text
+        // constantly, and snapping them straight from 1.0 to 0.3 strobed.
+        //
+        // The target is still binary - this eases the transition, it doesn't
+        // soften the boundary. A cell half in and half out of a line's box
+        // reads as fully "on the text", same as before.
+        const step = this.dimStep;
         for ( let i = 0; i < gridPositions.length; i++) {
             const p = gridPositions[i];
             const s = this.cellSprites[i];
@@ -168,8 +201,13 @@ class EmojiGrid {
             const x = p.x - s.w / 2;
             const y = p.y - s.h / 2;
 
-            const onText = overlapsTypedText( x, y, s.w, s.h);
-            const finalAlpha = this.alpha * ( onText ? emojiMinAlpha : emojiAlphaScale);
+            const target = dimTargetFor( p, s);
+            let dim = this.cellDim[i];
+            if ( dim < target)      dim = min( dim + step, target);
+            else if ( dim > target) dim = max( dim - step, target);
+            this.cellDim[i] = dim;
+
+            const finalAlpha = this.alpha * dim;
             if ( finalAlpha <= 0) continue;
 
             ctx.globalAlpha = finalAlpha;

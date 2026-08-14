@@ -1,18 +1,38 @@
 // palette.js -- fonts, the rainbow letter colors, and the crayon table.
 
-// Seven display fonts the phrase rotates through, one per new phrase. CSS
-// font stacks rather than single family names: each entry names a preferred
-// family plus graceful fallbacks, since the nice ones aren't installed
-// everywhere. Weight is a separate flag because a CSS family name can't
-// carry it.
+// Eight display fonts the phrase rotates through, one per new phrase. Each
+// names a single font family bundled in ../fonts/ and declared by
+// fonts/fonts.css, which index.html links. Weight stays a separate flag
+// because a CSS family name can't carry it.
+//
+// These MUST be bare, unquoted, single family names - not CSS font stacks,
+// and not pre-quoted. p5's textFont() wraps whatever string it's handed in
+// double quotes before assigning it to the canvas context, so a stack
+// arrives as one family literally named "A, B, serif" and a pre-quoted
+// name as "'A'"; neither exists, and the canvas silently falls back to its
+// default font for every slot. This table used to hold stacks, which is
+// exactly the bug that hid - all seven fonts rendered identically. The
+// per-family fallbacks that the stacks were reaching for now live in
+// fonts.css's src: descriptors, where they actually work.
+//
+// The bundled faces are open-licensed stand-ins, not the fonts the
+// Processing original named - Georgia, Tahoma, Segoe Script, Constantia,
+// Palatino Linotype, Cambria and Comic Sans MS are all Microsoft/Linotype
+// fonts that can't be redistributed as webfonts. fonts/README.md has the
+// full mapping; Gelasio and Caladea are metric-compatible with Georgia and
+// Cambria, so those slots wrap identically to the originals.
+//
+// The last entry is new: the original rotated through seven fonts and had
+// no Comic Sans slot.
 const fonts = [
-  { family: "Georgia, 'Times New Roman', serif",                    bold: true  },
-  { family: "Tahoma, Verdana, sans-serif",                          bold: true  },
-  { family: "'Segoe Script', 'Brush Script MT', cursive",           bold: false },
-  { family: "Constantia, Georgia, serif",                           bold: false },
-  { family: "'Palatino Linotype', Palatino, 'Book Antiqua', serif", bold: false },
-  { family: "Cambria, Georgia, serif",                              bold: true  },
-  { family: "Georgia, 'Times New Roman', serif",                    bold: false },
+  { family: "Gelasio",        bold: true  },  // Georgia
+  { family: "Open Sans",      bold: true  },  // Tahoma
+  { family: "Caveat",         bold: false },  // Segoe Script
+  { family: "Source Serif 4", bold: false },  // Constantia
+  { family: "EB Garamond",    bold: false },  // Palatino Linotype
+  { family: "Caladea",        bold: true  },  // Cambria
+  { family: "Gelasio",        bold: false },  // Georgia
+  { family: "Comic Neue",     bold: true  },  // Comic Sans MS
 ];
 
 // The 10 rainbow letter colors. Kept as plain hex strings here -- p5

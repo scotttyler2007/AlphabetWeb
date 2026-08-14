@@ -19,8 +19,12 @@ will not work — the browser blocks the `js/*.js` loads under `file://`.
 ## Deploying
 
 It's plain static files with no build step, so any static host works — GitHub Pages,
-Cloudflare Pages, Netlify. Upload `index.html` and `js/`. p5.js loads from a pinned
-CDN (`p5@1.11.3`); vendor it locally if you'd rather not depend on jsdelivr.
+Cloudflare Pages, Netlify. Upload `index.html`, `js/`, `fonts/` and the two
+`favicon.*` files — the whole `fonts/` folder, including `OFL.txt`, which the font
+license requires travel with the files. `favicon.ico` belongs at the site root,
+where browsers look for it whether or not they read the `<link>` tags. p5.js loads
+from a pinned CDN (`p5@1.11.3`); vendor it locally if you'd rather not depend on
+jsdelivr.
 
 ## How it's organized
 
@@ -43,6 +47,9 @@ line-by-line translation rather than a rewrite.
 | `js/sound.js` | `Sound.pde` |
 | `js/sketch.js` | `sketch.pde` |
 
+`fonts/` has no Processing counterpart — the original used `createFont()` against
+whatever was installed on the machine. See [fonts/README.md](fonts/README.md).
+
 ## Known differences from the Processing original
 
 **Desktop only.** The sketch is entirely keyboard-driven and there is no touch or
@@ -53,10 +60,15 @@ emoji font the visitor's OS provides (Segoe UI Emoji / Apple Color Emoji / Noto 
 Emoji). Older systems will show tofu boxes for newer codepoints like 🪼 and 🫧. No
 emoji webfont is bundled — that would cost ~10MB.
 
-**Fonts are CSS stacks, not the original's names.** Browsers can't resolve
-`"Georgia Bold"` as a family, and Segoe Script / Constantia / Cambria / Palatino
-Linotype are Windows-only. `palette.js` keeps the 7-font rotation using family stacks
-plus an explicit bold flag, so it degrades gracefully off Windows.
+**Fonts are bundled open-licensed stand-ins.** Segoe Script / Constantia / Cambria /
+Palatino Linotype are Windows-only, and Georgia / Tahoma / Comic Sans MS aren't
+redistributable as webfonts either, so `fonts/` ships an OFL-licensed lookalike for
+each slot (Gelasio, Open Sans, Caveat, Source Serif 4, EB Garamond, Caladea, Comic
+Neue) and the sketch renders identically on every OS. `palette.js` names one family
+per slot plus an explicit bold flag; the OS originals survive as `local()` fallbacks
+in `fonts/fonts.css`. See [fonts/README.md](fonts/README.md).
+
+**The rotation is 8 fonts, not 7.** The original had no Comic Sans slot.
 
 **The emoji mute tint is gone.** The original set an RGBA paint before `drawString`,
 but color-emoji glyphs ignore the RGB part — only the alpha ever applied. The port

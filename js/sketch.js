@@ -54,9 +54,15 @@ function setup() {
     initTheme();  // must run before anything draws - see theme.js
     setupEmoji(); // needs width/height, so it has to follow createCanvas()
 
-    // loadFonts() and pfonts are gone: there's no PFont/createFont() step
-    // any more, palette.js's `fonts` table names CSS font stacks that
-    // useFont() (typingBuffer.js) applies directly by name.
+    // The original's loadFonts() built PFont handles with createFont() and
+    // parked them in a pfonts array; there's no such handle here, since
+    // palette.js's `fonts` table names CSS font stacks that useFont()
+    // (typingBuffer.js) applies by name. What survives the port is only
+    // the "start the fonts loading" half of the job: the stacks lead with
+    // webfonts bundled in fonts/, and canvas won't fetch those on its own.
+    // Unlike loadFonts() this doesn't block - nothing is on screen to
+    // mis-measure at startup, and preloadFonts() re-lays-out on arrival.
+    preloadFonts();
     //
     // setupSound() is gone too: it only ever built the fixed SinOsc/Env
     // voice pool that config.js's SOUND_VOICES used to size, and that
@@ -98,32 +104,22 @@ function windowResized() {
 }
 
 function keyPressed() {
-    if (keyCode === ENTER || keyCode === DELETE) {
-        // First Enter on a freshly-typed (or arrow-scrolled) match just
-        // triggers its animation - background tint, emoji burst, fanfare -
-        // without dispersing anything yet. Only once that match has
-        // already been confirmed (or there's no match at all) does Enter
-        // perform the normal dispersal.
-        if (keyCode === ENTER && hasNewMatch()) {
+    if (keyCode === ENTER) {
+        if (hasNewMatch()) {
             confirmMatch();
-            return false;
+        return false;
         }
-        // Enter or Delete will flushTyping() but only ENTER will change to the next font
-        if (typing.length > 0) {
-            playDisperseSound(typing.length);
-            flushTyping();
-            currentText = "";
-            if (keyCode === ENTER) nextFont();
-            updateMatches();
-            revertMatchVisuals()
-        }
+        playBackspaceSound(typing.length)
+    }
+    if (keyCode === DELETE) {
+        if (typing.length > 0) playDisperseSound(typing.length);
+        flushTyping();
+        nextFont();
+        updateMatches();
+        revertMatchVisuals();
         return false
     }
 
-    // The original tested `key == CODED` first and then branched on
-    // keyCode for the arrow keys; p5 has no CODED equivalent, so this
-    // tests keyCode against UP_ARROW/DOWN_ARROW/LEFT_ARROW/RIGHT_ARROW
-    // directly.
     if (keyCode === UP_ARROW || keyCode === DOWN_ARROW || keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
         if (keyCode === UP_ARROW || keyCode === DOWN_ARROW) {
             colorIndex = wrapIndex(colorIndex, (keyCode === DOWN_ARROW) ? 1 : -1, crayons.length);
@@ -141,6 +137,7 @@ function keyPressed() {
             playBackspaceSound(typing.length);
             layoutTyping();
             updateMatches();
+            if (typing.length <= 0) revertMatchVisuals();
         }
         return false;
     }

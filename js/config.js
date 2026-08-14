@@ -19,12 +19,19 @@ const emojiGridSpacing = 260;   // distance between adjacent emoji cells in the 
 const emojiFadeSeconds = 0.2;   // how fast the whole grid fades in/out
 const emojiOverscan = emojiGridSpacing; // extra margin beyond every edge so the grid feels endless
 const emojiSize = 120;          // render size for background emoji (separate from letter size)
-// Emoji opacity is a straight either/or, with no gradient between them: a
-// cell that overlaps a line of the typed phrase draws at emojiMinAlpha, and
-// every other cell draws at emojiAlphaScale. typingBuffer.js measures the
-// per-line boxes; emojiGrid.js does the overlap test.
+// A cell that overlaps a line of the typed phrase targets emojiMinAlpha;
+// every other cell targets emojiAlphaScale. The overlap test itself stays a
+// straight either/or - a cell is on the text or it isn't - but the cell
+// eases between the two levels over emojiDimFadeSeconds instead of snapping
+// to them. Without that easing every keystroke re-lays out the phrase and
+// flips whole rows of cells in a single frame, which reads as a strobe.
+// typingBuffer.js measures the per-line boxes; emojiGrid.js does the
+// overlap test and the easing.
 const emojiAlphaScale = 1.0;   // emoji clear of the text
 const emojiMinAlpha = 0.3;     // emoji underneath the text - lower it to push them further back
+// Seconds per full 0..1 of alpha travel, same convention as emojiFadeSeconds
+// above - so the 1.0 -> 0.3 dip actually takes 0.7 of it, about 0.18s.
+const emojiDimFadeSeconds = 0.25;
 const emojiMuteTint = 0.75;    // gray fill tint mixed in (helps mute on fonts that respect fill)
 
 // -- sound --
@@ -45,4 +52,11 @@ const typeBaseFreq = 500;       // pitch with an empty buffer
 const typeSemitonesPerChar = 1; // each char steps up by this many semitones
 const backspaceBaseFreq = 260;  // lower base than typing, per request
 const backspaceSemitonesPerChar = 1;
-const backspaceFreqCap = 700;
+
+// Nothing bounds the blip pitch any more. Two constants used to: backspace
+// FreqCap (700) clamped it with a min(), and noteCycleLength (13) wrapped it
+// back to base after an octave. Both stopped the sound tracking the buffer -
+// the cap by flattening every long buffer onto one note, the wrap by
+// dropping an octave mid-phrase. The pitch now just keeps stepping, up while
+// typing and down while deleting. See sound.js for where that runs out of
+// audible room.

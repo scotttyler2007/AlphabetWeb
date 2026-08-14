@@ -329,7 +329,7 @@ const keywordAliases = {
     // -- animals --
     puppy: "dog", pup: "dog", doggy: "dog", puppydog: "dog",
     kitty: "cat", kitten: "cat", bunny: "rabbit", piggy: "pig",
-    birdie: "bird", horsey: "horse", ducky: "duck", joey: "kangaroo",
+    birdie: "bird", horsey: "horse", pony: "horse", ducky: "duck", joey: "kangaroo",
     // -- vehicles --
     auto: "car", automobile: "car", airplane: "plane", aeroplane: "plane",
     jet: "plane", lorry: "truck", cycle: "bicycle", sailboat: "boat",
@@ -350,7 +350,7 @@ const keywordAliases = {
     sneaker: "shoe", trainer: "shoe", cap: "hat", jewel: "gem",
     photo: "camera", watch: "clock", bulb: "lightbulb",
     // -- emotions & face --
-    funny: "laugh", mad: "angry", tired: "sleepy", cry: "sad", grin: "smile",
+    lol: "laugh", funny: "laugh", mad: "angry", tired: "sleepy", cry: "sad", grin: "smile", friend: "happy",
     // -- shapes, fantasy, sports --
     box: "square", zombie: "monster", hoops: "basketball",
     // -- buildings & property --
