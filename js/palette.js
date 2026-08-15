@@ -27,7 +27,7 @@
 const fonts = [
   { family: "Gelasio",        bold: true  },  // Georgia
   { family: "Open Sans",      bold: true  },  // Tahoma
-  { family: "Caveat",         bold: false },  // Segoe Script
+  // { family: "Caveat",         bold: false },  // Segoe Script
   { family: "Source Serif 4", bold: false },  // Constantia
   { family: "EB Garamond",    bold: false },  // Palatino Linotype
   { family: "Caladea",        bold: true  },  // Cambria
