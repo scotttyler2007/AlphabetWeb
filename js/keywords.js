@@ -42,7 +42,7 @@ const keywords = [
     {name: "lion", bg: '#553d11', emoji: ["🦁"]},
     {name: "tiger", bg: '#65350b', emoji: ["🐯", "🐅"]},
     {name: "bear", bg: '#3d2714', emoji: ["🐻"]},
-    {name: "polar bear", bg: '#add6d8', emoji: ["🐻‍❄️"]},
+    {name: "polarbear", bg: '#add6d8', emoji: ["🐻‍❄️"]},
     {name: "panda", bg: '#5c5c5c', emoji: ["🐼"]},
     {name: "koala", bg: '#4d4d4d', emoji: ["🐨"]},
     {name: "monkey", bg: '#3b2816', emoji: ["🐵", "🐒"]},
