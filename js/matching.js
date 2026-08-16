@@ -14,7 +14,28 @@ let emojiIndex = 0; // stays synced to whichever emoji keyword is matched/select
 // already been confirmed un-confirms it, reverting the visuals until
 // Enter confirms again.
 let activeColorName = null;   // crayon color word currently matched, if any
-let activeKeyword = null;     // emoji keyword currently matched, if any
+let activeKeyword = null;     // emoji keyword(s) currently matched, if any
+
+// Which emoji grid the phrase produces when more than one keyword matches.
+//
+//   true  - one grid built from every match, their emoji sets interleaved,
+//           so "the tree and the lobster" drifts trees and lobsters together
+//   false - one grid from the last matching word only, which is what the
+//           Processing original did and what every earlier version of this
+//           port did: a later keyword replaced whatever the previous one
+//           had staged
+//
+// Lives here rather than in config.js because it is mode state, not a tuning
+// number, and because it's a plain `let`: flipping it in the console takes
+// effect on the next match, no reload. Nothing caches a decision made from
+// it - updateMatches() re-reads it every keystroke.
+let combineEmojiSets = true;
+
+// Indices into `keywords` for everything the phrase currently matches, in
+// reading order. One entry (or none) when combineEmojiSets is off. This is
+// what builds the grid; activeKeyword is the identity string derived from it
+// that hasNewMatch() and confirmMatch() compare against.
+let activeKeywordIndices = [];
 
 // What the visuals are actually showing right now, as opposed to what the
 // buffer merely matches. confirmMatch() sets these; revertMatchVisuals()
@@ -145,6 +166,72 @@ function findWordMatch( tokens, lookup) {
     return -1;
 }
 
+// Every entry the phrase resolves to, in reading order and deduplicated, so
+// "the tree and the lobster" yields both. Only the combined emoji mode uses
+// this; the crayon background still takes a single winner, because a
+// background can only be one color.
+//
+// Deduped by index rather than by word, so "cats and a kitty" - two
+// different spellings that both land on `cat` - contributes one set, not the
+// same set twice.
+function findAllWordMatches( tokens, lookup) {
+    const hits = [];
+    const seen = new Set();
+    for ( const token of tokens) {
+        for ( const form of wordVariants( token)) {
+            const hit = lookup.get( form);
+            if ( hit === undefined) continue;
+            if ( !seen.has( hit)) { seen.add( hit); hits.push( hit); }
+            break; // first variant that resolves wins, same rule findWordMatch uses
+        }
+    }
+    return hits;
+}
+
+// Round-robin merge of several keyword emoji sets into one: first glyph of
+// every set, then the second of every set, and so on. A set shorter than the
+// longest wraps back to its own start rather than dropping out, so the
+// alternation holds all the way through instead of decaying into a block of
+// whichever keyword happened to carry the most glyphs. "tree" (3 glyphs)
+// with "lobster" (1) gives
+//
+//     tree0  lobster0  tree1  lobster0  tree2
+//
+// The run stops the moment the longest set delivers its final glyph, which
+// is why there's no sixth entry: ending on a wrapped repeat would make the
+// sequence look padded rather than alternating.
+//
+// Wrapping is safe because validateTables() rejects any keyword with an
+// empty emoji array, so `round % set.length` can never divide by zero.
+//
+// Repeats are kept rather than filtered. Two keywords that share a glyph
+// ("bird" and "chick" both carry the chick) genuinely matched twice, and
+// dropping the duplicate would break the alternation that is the whole
+// point of interleaving.
+function interleaveEmojiSets( indices) {
+    const sets = indices.map( i => keywords[i].emoji);
+    if ( sets.length === 1) return sets[0];
+
+    const longest = Math.max( ...sets.map( s => s.length));
+
+    // The LAST set of maximum length, not the first. When several sets tie
+    // for longest, every one of them should still place its final glyph
+    // before the run ends - stopping at the first would truncate the others.
+    let finisher = 0;
+    for ( let s = 0; s < sets.length; s++) {
+        if ( sets[s].length === longest) finisher = s;
+    }
+
+    const merged = [];
+    for ( let round = 0; round < longest; round++) {
+        for ( let s = 0; s < sets.length; s++) {
+            merged.push( sets[s][ round % sets[s].length]);
+            if ( round === longest - 1 && s === finisher) return merged;
+        }
+    }
+    return merged;
+}
+
 function updateMatches() {
     const tokens = tokenize( currentText);
 
@@ -152,17 +239,40 @@ function updateMatches() {
     if ( ci >= 0) colorIndex = ci;
     activeColorName = ( ci >= 0) ? crayons[ci].name : null;
 
-    const ki = findWordMatch( tokens, keywordLookup);
-    if ( ki >= 0) emojiIndex = ki;
-    activeKeyword = ( ki >= 0) ? keywords[ki].name : null;
+    // Single-match mode goes through findWordMatch() rather than taking the
+    // tail of findAllWordMatches(): the two disagree on a phrase that repeats
+    // a keyword ("cat dog cat"), where dedup-in-reading-order ends on `dog`
+    // but last-word-wins ends on `cat`. Calling the original function is what
+    // keeps this mode byte-for-byte the behaviour it always had.
+    if ( combineEmojiSets) {
+        activeKeywordIndices = findAllWordMatches( tokens, keywordLookup);
+    } else {
+        const ki = findWordMatch( tokens, keywordLookup);
+        activeKeywordIndices = ( ki >= 0) ? [ ki] : [];
+    }
+
+    // emojiIndex tracks the last match either way. It's where the arrow keys
+    // resume scrolling from (sketch.js) and which keyword's bg confirmMatch()
+    // falls back to, and both of those want one answer, not a list.
+    if ( activeKeywordIndices.length > 0) emojiIndex = activeKeywordIndices[ activeKeywordIndices.length - 1];
+
+    // Joining the names gives the set a single identity that the existing
+    // !== comparisons still work on, so hasNewMatch() and confirmMatch() need
+    // no notion of "a list of keywords" at all. "tree" and "tree+lobster" are
+    // different strings, so adding a second keyword to the phrase correctly
+    // reads as a new match worth staging.
+    activeKeyword = activeKeywordIndices.length === 0
+        ? null
+        : activeKeywordIndices.map( i => keywords[i].name).join( "+");
 
     // Deliberately does NOT revert the visuals: once a match is showing it
     // stays until something new is staged or the scene is cleared. Typing
     // past "cat" shouldn't yank the cats away mid-sentence, and keeping
     // them is what lets a phrase like "cats and dogs" be walked through one
-    // keyword at a time. Nothing else needs resetting here either - whether
-    // Enter has work to do is derived by hasNewMatch(), not tracked by a
-    // flag that an edit could leave stale.
+    // keyword at a time - in single-match mode one keyword at a time, and in
+    // combined mode by accumulating them into a bigger set. Nothing else
+    // needs resetting here either - whether Enter has work to do is derived
+    // by hasNewMatch(), not tracked by a flag that an edit could leave stale.
 }
 
 // Stages the current match - background tint, contrast letters, emoji
@@ -171,6 +281,10 @@ function updateMatches() {
 // (this also covers words like "peach" or "flamingo" that happen to be
 // both a crayon and an emoji keyword); the emoji burst still spawns for a
 // matched keyword regardless of which one wins the background.
+//
+// With combineEmojiSets on and several keywords matched, the background
+// still comes from just one of them - the last, via emojiIndex - since a
+// background can only be one color. Only the emoji set combines.
 function confirmMatch() {
     let target = bgCol;
     if ( activeColorName !== null) {
@@ -185,8 +299,8 @@ function confirmMatch() {
     // they are, not flicker the same set out and back in.
     if ( activeKeyword !== shownKeyword) {
         fadeOutEmojiGrids();
-        if ( activeKeyword !== null) {
-            spawnEmojiGrid( keywords[ emojiIndex].emoji);
+        if ( activeKeywordIndices.length > 0) {
+            spawnEmojiGrid( interleaveEmojiSets( activeKeywordIndices));
         }
     }
 

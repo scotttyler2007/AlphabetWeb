@@ -138,6 +138,15 @@ in `fonts/fonts.css`. See [fonts/README.md](fonts/README.md).
 
 **The rotation is 8 fonts, not 7.** The original had no Comic Sans slot.
 
+**Several keywords can share one emoji grid.** The original matched only the last
+keyword in the phrase, and a later word replaced whatever the previous one had
+staged. By default this port matches every keyword in the phrase and interleaves
+their emoji sets into a single grid, so "the tree and the lobster" drifts trees and
+lobsters together, alternating between the sets. Set `combineEmojiSets = false` in
+`js/matching.js` for the original last-word-wins behaviour; it's a plain `let`, so it
+can also be flipped from the console without a reload. The background tint still
+comes from one keyword either way — a background can only be one color.
+
 **The emoji mute tint is gone.** The original set an RGBA paint before `drawString`,
 but color-emoji glyphs ignore the RGB part — only the alpha ever applied. The port
 keeps the alpha and drops the tint. This is the one intentional visual difference.

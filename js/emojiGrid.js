@@ -222,10 +222,16 @@ class EmojiGrid {
     }
 }
 
-// Rasterizes each unique glyph in the set exactly once. Only emojiSet.length
-// distinct glyphs ever appear (the grid cycles them by index), so measuring
-// and painting each one once and reusing the result across every cell that
-// draws it is the whole performance story of this file.
+// Rasterizes each distinct glyph in the set exactly once - measuring and
+// painting a glyph once and reusing the result across every cell that draws
+// it is the whole performance story of this file.
+//
+// The returned array still holds one entry per slot in emojiSet, so cell
+// assignment is unchanged; entries that repeat a glyph just share the one
+// sprite object. That sharing matters now that matching.js can interleave
+// several keywords' sets: wrapping a short set around to fill the run
+// deliberately repeats its glyphs, so an emojiSet of [tree0, lobster, tree1,
+// lobster, tree2] must not rasterize the lobster twice.
 //
 // measureText's actualBoundingBox* fields are the direct analogue of the
 // original's getStringBounds() - they give the true painted box, which is
@@ -238,8 +244,12 @@ function buildEmojiSprites( emojiSet) {
     const probe = document.createElement( 'canvas').getContext( '2d');
     probe.font = font;
 
+    const byGlyph = new Map();
     const sprites = [];
     for ( const glyph of emojiSet) {
+        const cached = byGlyph.get( glyph);
+        if ( cached !== undefined) { sprites.push( cached); continue; }
+
         const m = probe.measureText( glyph);
 
         // Fall back to the advance width / em box if a browser doesn't
@@ -264,7 +274,9 @@ function buildEmojiSprites( emojiSet) {
         c.textBaseline = 'alphabetic';
         c.fillText( glyph, bl + SPRITE_PAD, ba + SPRITE_PAD);
 
-        sprites.push( { canvas: canvas, w: w, h: h });
+        const sprite = { canvas: canvas, w: w, h: h };
+        byGlyph.set( glyph, sprite);
+        sprites.push( sprite);
     }
     return sprites;
 }
