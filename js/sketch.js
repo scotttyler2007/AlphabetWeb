@@ -103,13 +103,30 @@ function windowResized() {
     layoutTyping(); // re-centers the phrase currently being typed
 }
 
+// What may enter the typing buffer. Letters and digits are the point of the
+// sketch; the space and hyphen are here because they are the two word
+// separators the matcher understands - tokenize() (matching.js) splits on
+// both, so "polar bear" and "polar-bear" reach the same keyword, and blocking
+// them would make every multi-word entry untypeable.
+//
+// Everything else printable - punctuation, brackets, quotes, symbols - is
+// refused. None of it can contribute to a match (tokenizing discards it), so
+// all it ever did was fill the screen with characters that dissolve into
+// nothing, and on a keyboard being mashed by a child that is most of them.
+// The hyphen sits last inside the class so it reads as a literal, not a range.
+const ALLOWED_CHAR = /^[A-Za-z0-9 -.!?']$/;
+
+// The subset of the above that can't lead: both are separators, and a buffer
+// opening with one has nothing to separate.
+const SEPARATOR_CHAR = /^[ -]$/;
+
 function keyPressed() {
     if (keyCode === ENTER) {
         if (hasNewMatch()) {
             confirmMatch();
         return false;
         }
-        playBackspaceSound(typing.length)
+        playBackspaceSound(0)
     }
     if (keyCode === DELETE) {
         if (typing.length > 0) playDisperseSound(typing.length);
@@ -131,6 +148,38 @@ function keyPressed() {
         return false;
     }
 
+    if (keyCode === 36) {// HOME
+        combineEmojiSets = !combineEmojiSets;
+        combineEmojiSets ? playTypeSound(0) : playBackspaceSound(0);
+    }
+
+    if (keyCode === 35) {// END
+        // Clear whatever is staged - emoji grid, background tint, letter
+        // color - if anything is, otherwise just beep. shownColorName and
+        // shownKeyword are the pair confirmMatch() sets and
+        // revertMatchVisuals() clears, so together they are exactly "there is
+        // something on screen to clear". Either can be set alone: a crayon
+        // with no keyword ("blue") sets only the first, a keyword with no
+        // crayon ("cat") only the second, and revertMatchVisuals() undoes the
+        // whole scene either way - which is why the test has to cover both,
+        // or END would refuse to clear a background it is perfectly capable
+        // of clearing.
+        //
+        // Not hasNewMatch(): that asks whether the buffer matches something
+        // that ISN'T showing yet, so it's true for a word typed but not
+        // confirmed and false once Enter has staged it - backwards on both
+        // counts. Not emojiGrids.length either: a grid already told to fade
+        // out stays in that array until its alpha reaches 0, so a quick
+        // double tap of END would clear twice instead of beeping.
+        if (shownKeyword !== null || shownColorName !== null) {
+            playScrollSound();
+            revertMatchVisuals();
+            return false;
+        }
+        playBackspaceSound(0);
+        return false;
+    }
+
     if (keyCode === BACKSPACE) {
         if (typing.length > 0) {
             popTypingChar();
@@ -142,21 +191,21 @@ function keyPressed() {
         return false;
     }
 
-    // Any normal printable character - letters, digits, punctuation, space.
-    // p5's `key` is already a string, so this tests key.length === 1 (a
-    // multi-char string like "ArrowUp" or "Backspace" means a non-printable
-    // key that keyCode already handled above) and its char code in 32..126,
-    // and passes `key` straight to appendChar() instead of str(key).
+    // A printable key at all? p5's `key` is already a string, so this tests
+    // key.length === 1 (a multi-char string like "ArrowUp" or "Shift" means a
+    // non-printable key, handled above or ignored) and its char code in
+    // 32..126. Keys that fail this stay silent - a modifier shouldn't blip.
     if (key.length === 1 && key.charCodeAt(0) >= 32 && key.charCodeAt(0) <= 126) {
-        // The buffer can't start with a space (or other whitespace) - deny
-        // it and use the backspace sound as a "nope" cue. Spaces are still
-        // fine once there's at least one visible character in the buffer.
-        // Character.isWhitespace(key) had no single-char JS equivalent, so
-        // this uses a regex test; within the 32..126 range already checked
-        // above, the space character (32) is the only match it can ever
-        // produce.
-        if (typing.length === 0 && /\s/.test(key)) {
-            playBackspaceSound(typing.length);
+        // ...and is it a character the buffer accepts? Anything printable but
+        // disallowed is refused here with the backspace "nope" cue rather
+        // than being typed. See ALLOWED_CHAR above for what's in and why.
+        //
+        // The buffer also can't OPEN with a separator: a leading space or
+        // hyphen is the same kind of junk a leading space always was, and it
+        // would tokenize away to nothing anyway. Separators are fine once
+        // there's at least one visible character to separate from.
+        if (!ALLOWED_CHAR.test(key) || (typing.length === 0 && SEPARATOR_CHAR.test(key))) {
+            playBackspaceSound(0);
             return false;
         }
 

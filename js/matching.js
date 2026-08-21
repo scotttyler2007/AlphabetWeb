@@ -140,30 +140,76 @@ function wordVariants( word) {
 // Built once at load: matching.js runs after palette.js and keywords.js
 // (see the script order in index.html), so both tables exist by now, and
 // neither ever changes.
+// Names and aliases may be multi-word ("polar bear"), written with single
+// spaces. tokenize() has already thrown the spaces away by match time, so
+// what gets looked up is a run of adjacent tokens rejoined - see matchAt().
+// maxWords is how far that run ever has to reach, derived from the table
+// rather than assumed, so a table of only single words costs exactly what it
+// did before: one lookup per token.
 function buildLookup( entries, aliases) {
-    const m = new Map();
-    for ( let i = 0; i < entries.length; i++) m.set( entries[i].name, i);
+    const map = new Map();
+    for ( let i = 0; i < entries.length; i++) map.set( entries[i].name, i);
     for ( const alias in aliases) {
-        if ( m.has( alias)) continue;              // never shadow a real name
-        const i = m.get( aliases[ alias]);
-        if ( i !== undefined) m.set( alias, i);
+        if ( map.has( alias)) continue;            // never shadow a real name
+        const i = map.get( aliases[ alias]);
+        if ( i !== undefined) map.set( alias, i);
     }
-    return m;
+
+    let maxWords = 1;
+    for ( const key of map.keys()) {
+        const words = key.split( " ").length;
+        if ( words > maxWords) maxWords = words;
+    }
+    return { map: map, maxWords: maxWords };
 }
 const crayonLookup = buildLookup( crayons, crayonAliases);
 const keywordLookup = buildLookup( keywords, keywordAliases);
 
-// Index of the LAST word in the phrase that resolves to a table entry, or
-// -1. Last rather than first so the display keeps up with the typist: in
-// "cat dog" the word you just finished is the one you see.
-function findWordMatch( tokens, lookup) {
-    for ( let i = tokens.length - 1; i >= 0; i--) {
-        for ( const form of wordVariants( tokens[i])) {
-            const hit = lookup.get( form);
-            if ( hit !== undefined) return hit;
+// The longest phrase starting at tokens[i] that resolves, or null. Longest
+// first is what makes "polar bear" beat the "bear" sitting inside it -
+// shortest-first would match the wrong entry and never look further.
+//
+// Only the LAST word of a phrase gets run through wordVariants(): "polar
+// bears" should reach "polar bear", but inflecting the leading words too
+// would invent phrases nobody wrote ("polars bear") for no gain, and cost a
+// combinatorial number of lookups per position.
+function matchAt( tokens, i, lookup) {
+    const reach = Math.min( lookup.maxWords, tokens.length - i);
+    for ( let n = reach; n >= 1; n--) {
+        const head = ( n === 1) ? "" : tokens.slice( i, i + n - 1).join( " ") + " ";
+        for ( const form of wordVariants( tokens[ i + n - 1])) {
+            const hit = lookup.map.get( head + form);
+            if ( hit !== undefined) return { index: hit, words: n };
         }
     }
-    return -1;
+    return null;
+}
+
+// Every entry the phrase resolves to, in reading order, one per matching
+// position - so a word that matches twice appears twice. Both callers below
+// narrow this down differently.
+//
+// A matched phrase consumes all of its words, which is what stops "polar
+// bear" from also reporting the "bear" it contains. Non-matching tokens are
+// stepped over one at a time.
+function findMatchPositions( tokens, lookup) {
+    const hits = [];
+    let i = 0;
+    while ( i < tokens.length) {
+        const span = matchAt( tokens, i, lookup);
+        if ( span === null) { i++; continue; }
+        hits.push( span.index);
+        i += span.words;
+    }
+    return hits;
+}
+
+// Index of the LAST entry the phrase resolves to, or -1. Last rather than
+// first so the display keeps up with the typist: in "cat dog" the word you
+// just finished is the one you see.
+function findWordMatch( tokens, lookup) {
+    const hits = findMatchPositions( tokens, lookup);
+    return ( hits.length > 0) ? hits[ hits.length - 1] : -1;
 }
 
 // Every entry the phrase resolves to, in reading order and deduplicated, so
@@ -177,13 +223,8 @@ function findWordMatch( tokens, lookup) {
 function findAllWordMatches( tokens, lookup) {
     const hits = [];
     const seen = new Set();
-    for ( const token of tokens) {
-        for ( const form of wordVariants( token)) {
-            const hit = lookup.get( form);
-            if ( hit === undefined) continue;
-            if ( !seen.has( hit)) { seen.add( hit); hits.push( hit); }
-            break; // first variant that resolves wins, same rule findWordMatch uses
-        }
+    for ( const hit of findMatchPositions( tokens, lookup)) {
+        if ( !seen.has( hit)) { seen.add( hit); hits.push( hit); }
     }
     return hits;
 }
@@ -324,16 +365,33 @@ function revertMatchVisuals() {
 // comparison here any more: name, bg and emoji live in one record, so they
 // cannot fall out of step with each other and there is nothing to compare.
 // What's left are the things a single record can still get wrong.
+// The only spelling a table entry can have and still be reachable. tokenize()
+// lowercases and splits on every non-letter, then matchAt() rejoins adjacent
+// tokens with exactly one space - so lowercase a-z words, single-spaced, is
+// precisely the set of names typing can ever produce. Anything else (a
+// hyphen, an apostrophe, a digit, a capital, a double space) builds a key no
+// phrase can reach, and would sit in the table looking correct while never
+// once matching.
+const MATCHABLE_NAME = /^[a-z]+( [a-z]+)*$/;
+
 function validateTables() {
+    const seenNames = new Set();
     for ( let i = 0; i < keywords.length; i++) {
         const k = keywords[i];
         // EmojiGrid cycles its cells with i % emojiSet.length, so an empty
         // emoji set would divide by zero the moment that keyword is confirmed.
         if ( !k.emoji || k.emoji.length === 0) fail( `keyword "${k.name}" (index ${i}) has no emoji`);
         if ( !/^#[0-9a-fA-F]{6}$/.test( k.bg))  fail( `keyword "${k.name}" has a bad bg color: ${k.bg}`);
+        if ( !MATCHABLE_NAME.test( k.name))     fail( `keyword "${k.name}" (index ${i}) is not typeable: names must be lowercase a-z words separated by single spaces`);
+        // buildLookup() maps name -> index, so a repeated name silently keeps
+        // the last one and orphans every earlier entry: still reachable by
+        // arrow-scrolling, never by typing.
+        if ( seenNames.has( k.name)) fail( `keyword "${k.name}" is defined twice (index ${i}) - the earlier entry can never be typed`);
+        seenNames.add( k.name);
     }
     for ( const c of crayons) {
         if ( !/^#[0-9a-fA-F]{6}$/.test( c.color)) fail( `crayon "${c.name}" has a bad color: ${c.color}`);
+        if ( !MATCHABLE_NAME.test( c.name))       fail( `crayon "${c.name}" is not typeable: names must be lowercase a-z words separated by single spaces`);
     }
     checkAliases( "keywordAliases", keywordAliases, keywords);
     checkAliases( "crayonAliases", crayonAliases, crayons);
@@ -355,7 +413,10 @@ function checkAliases( label, aliases, entries) {
         let problem = null;
         if ( real.has( alias))        problem = "is already a real entry, so it can never take effect";
         else if ( !real.has( target)) problem = `points at "${target}", which is not a real entry`;
-        else if ( alias.indexOf( " ") >= 0) problem = "contains a space, which tokenizing will split";
+        // Multi-word aliases work now - matchAt() rejoins adjacent tokens - so
+        // the old "contains a space" rejection is gone. What replaces it is
+        // the same spelling rule every name has to satisfy.
+        else if ( !MATCHABLE_NAME.test( alias)) problem = "is not typeable: aliases must be lowercase a-z words separated by single spaces";
         if ( problem) fail( `${label}: "${alias}" ${problem}`);
     }
 }
