@@ -133,10 +133,37 @@ the buffer against the field's value on every `input` event. That reconcile assu
 nothing about how much changed, which is what makes autocorrect, prediction and
 paste behave like ordinary typing.
 
-Swipes stand in for the arrow keys — up/down walks the crayons, left/right the
-keywords — and a tap asks for the keyboard back. Enter arrives either as a keydown
-or as a `beforeinput` with `insertLineBreak`; both are handled, because a
-single-line input silently discards the newline itself.
+**The touch control surface is deliberately smaller than the desktop one.** A phone
+has no arrow keys, no Enter, no Delete and no End, and hiding four more actions
+behind long-presses and multi-finger taps would make them undiscoverable rather than
+available. Touch gets two gestures:
+
+- **Swipe** — the arrow keys. Up/down walks the crayons, left/right the keywords. It
+  never raises the keyboard, and drops it if it is up: swiping is a browsing gesture,
+  and summoning a keyboard over the artwork you went looking for is backwards.
+- **Tap** — one control whose meaning follows the buffer, which is what lets a single
+  gesture cover Enter, clear *and* reopening the keyboard with no on-screen buttons:
+  nothing typed → open the keyboard; something to stage → Enter; already staged →
+  clear it all, back to nothing typed. The cycle returns to "nothing typed", so the
+  next tap raises the keyboard again.
+
+Enter also arrives from the keyboard itself, either as a keydown or as a
+`beforeinput` with `insertLineBreak`; both are handled, because a single-line input
+silently discards the newline.
+
+DELETE (disperse + next font) and HOME (toggle combined emoji sets) have no touch
+equivalent. Both are refinements rather than core actions, and the concession buys an
+interface with two gestures instead of six.
+
+**The canvas covers the layout viewport, not the visible one.** These differ once a
+soft keyboard is up, and conflating them put a black band under the sketch on
+Android: sizing the canvas to the visible area leaves the strip beneath it showing
+the body's static `#020701` while the canvas paints `bgCurrent` — two different
+blacks the moment a crayon is matched. Only the typed phrase uses the visible
+rectangle, centring on `visibleCenterY()` so the word never hides behind the
+keyboard. Chrome for Android defaults to `interactive-widget=resizes-visual`, so
+`innerHeight` does not change when the keyboard opens, which also means no canvas
+resize and no grid rebuild on every keyboard toggle.
 
 **Sizes scale to the screen.** Every size in `config.js` was picked for a fullscreen
 desktop window — 180px letters fit two to a line on a 390px phone. `js/layout.js`

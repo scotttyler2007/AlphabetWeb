@@ -101,7 +101,7 @@ function nextFont() {
 function appendChar(glyph) {
     fontColor++;
     fontColor %= colors.length;
-    typing.push(new Char(glyph, font, fontColor, new p5.Vector(width / 2, height / 2)));
+    typing.push(new Char(glyph, font, fontColor, new p5.Vector(width / 2, visibleCenterY())));
 }
 
 // Shared body of "disperse everything currently being typed", factored
@@ -223,7 +223,10 @@ function layoutTyping() {
 
     const lineHeight = size * 0.95;
     const totalHeight = lines.length * lineHeight;
-    const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
+    // Centred on the VISIBLE middle, not the canvas middle: with a soft
+    // keyboard up those differ by half the keyboard, and the canvas middle
+    // is underneath it. See visibleCenterY() in layout.js.
+    const startY = visibleCenterY() - totalHeight / 2 + lineHeight / 2;
 
     typedTextBoxes.length = 0;
     for (let li = 0; li < lines.length; li++) {

@@ -26,19 +26,30 @@ function updateUiScale() {
     uiScale = Math.max( UI_SCALE_MIN, Math.min( 1, shortEdge / UI_SCALE_BASIS));
 }
 
-// The visible area, which is NOT the same as window.innerWidth/Height once a
-// soft keyboard is open. On Android the window itself shrinks, but on iOS it
-// does not - the keyboard is painted over the page, so innerHeight still
-// reports the full screen and a vertically centred phrase would sit halfway
-// underneath the keyboard. visualViewport reports only the uncovered part,
-// which is the rectangle the canvas should actually fill.
-function viewportW() {
+// Two different rectangles, and conflating them is what put a black band
+// under the sketch on Android.
+//
+// The LAYOUT viewport is the whole page, and it is what the canvas must
+// cover. Sizing the canvas to the visible area instead leaves the strip
+// beneath it showing the body's static #020701 while the canvas paints
+// bgCurrent - two different blacks the moment a crayon is matched, which
+// reads as a large dead band under the artwork.
+//
+// Chrome for Android defaults to interactive-widget=resizes-visual, so
+// opening the keyboard does NOT change innerHeight - it only shrinks the
+// visual viewport. Keeping the canvas on innerHeight therefore also means no
+// canvas resize and no grid rebuild every time the keyboard comes and goes.
+function viewportW() { return Math.round( window.innerWidth); }
+function viewportH() { return Math.round( window.innerHeight); }
+
+// The VISUAL viewport is the part of that page the reader can still see with
+// a keyboard up. Only the typed phrase cares: it centres here rather than on
+// the canvas, so the word never hides behind the keyboard. offsetTop matters
+// because iOS can scroll the visual viewport within the layout one.
+function visibleCenterY() {
     const vv = window.visualViewport;
-    return Math.round( ( vv && vv.width) || window.innerWidth);
-}
-function viewportH() {
-    const vv = window.visualViewport;
-    return Math.round( ( vv && vv.height) || window.innerHeight);
+    if ( !vv) return height / 2;
+    return vv.offsetTop + vv.height / 2;
 }
 
 // Every path that changes the visible area funnels through here: p5's
@@ -46,8 +57,19 @@ function viewportH() {
 // closing. Order matters - the scale has to be current before the grid and
 // the phrase re-derive their geometry from it.
 function applyViewport() {
-    resizeCanvas( viewportW(), viewportH());
-    updateUiScale();
-    rebuildGrid();   // emojiGrid.js - positions, per-cell arrays and sprite sizes
-    layoutTyping();  // typingBuffer.js - re-centres the phrase being typed
+    const w = viewportW();
+    const h = viewportH();
+
+    // Guarded, because this also fires every time the soft keyboard opens or
+    // closes, and that does not change the page size. Rebuilding the grid and
+    // re-rasterizing every sprite on each keyboard toggle would be pure waste.
+    if ( w !== width || h !== height) {
+        resizeCanvas( w, h);
+        updateUiScale();
+        rebuildGrid();   // emojiGrid.js - positions, per-cell arrays and sprite sizes
+    }
+
+    // Always: the canvas may be the same size while the visible centre has
+    // moved, which is exactly the keyboard case.
+    layoutTyping();      // typingBuffer.js - re-centres the phrase being typed
 }

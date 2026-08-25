@@ -152,10 +152,32 @@ function onTouchStart( e) {
     touchStart = { x: t.clientX, y: t.clientY, t: millis() };
 }
 
-// A swipe stands in for the arrow keys, one axis each, exactly as on desktop:
-// up/down walks the crayons, left/right walks the keywords. A tap - short,
-// and barely moved - just asks for the keyboard back, since once it closes
-// there is no visible field left to aim at.
+// The whole mobile control surface, deliberately smaller than the desktop
+// one. A phone has no arrow keys, no Enter, no Delete and no End, and hiding
+// four more actions behind long-presses and multi-finger taps would make them
+// undiscoverable rather than available. So touch gets two gestures:
+//
+//   swipe   - the arrow keys. Up/down walks the crayons, left/right the
+//             keywords. Never touches the keyboard: it is a browsing gesture,
+//             and having it summon a keyboard over the artwork you are trying
+//             to look at is exactly backwards.
+//
+//   tap     - one control whose meaning follows the buffer, which is what
+//             lets a single gesture cover Enter, clear AND reopening the
+//             keyboard without any on-screen buttons:
+//
+//               nothing typed      -> open the keyboard (you want to type)
+//               something to stage -> Enter (confirm the match)
+//               already staged     -> clear it all, back to nothing typed
+//
+//             so the cycle returns to "nothing typed", where the next tap
+//             raises the keyboard again. That is the answer to "how do I get
+//             the keyboard back" - clear the screen and tap, which is what a
+//             child does anyway when they want to type a new word.
+//
+// DELETE (disperse + next font) and HOME (toggle combined emoji sets) have no
+// touch equivalent. Both are refinements rather than core actions, and the
+// concession buys an interface with two gestures instead of six.
 const SWIPE_MIN_PX = 45;
 const TAP_MAX_PX = 12;
 const TAP_MAX_MS = 400;
@@ -171,7 +193,7 @@ function onTouchEnd( e) {
     touchStart = null;
 
     if ( Math.abs( dx) < TAP_MAX_PX && Math.abs( dy) < TAP_MAX_PX && held < TAP_MAX_MS) {
-        showSoftKeyboard();
+        onTap();
         return;
     }
 
@@ -189,5 +211,38 @@ function onTouchEnd( e) {
 
     // setBufferToWord() rewrote the buffer, so the field has to follow or the
     // next reconcile would read the swiped-in word as text to delete.
-    if ( softInput) softInput.value = currentText;
+    //
+    // Blurred as well as synced. A focused field is what Android takes as
+    // permission to re-raise the keyboard, so leaving focus on it means a
+    // swipe pops the keyboard back over the emoji the swipe just went looking
+    // for. Dropping focus is what actually keeps a hidden keyboard hidden.
+    if ( softInput) {
+        softInput.value = currentText;
+        softInput.blur();
+    }
+}
+
+// The one tap control. See the block above onTouchEnd() for why a single
+// gesture carries three meanings and how they cycle.
+function onTap() {
+    if ( typing.length === 0) {
+        showSoftKeyboard();
+        return;
+    }
+
+    if ( hasNewMatch()) {
+        confirmMatch();
+        return;
+    }
+
+    // Nothing left to stage, so this tap is the clear. Unlike desktop's END -
+    // which only reverts the visuals and leaves the phrase up - this also
+    // empties the buffer, because an empty buffer is what makes the NEXT tap
+    // reopen the keyboard. Leaving the phrase would strand the cycle with no
+    // way back to typing.
+    playDisperseSound( typing.length);
+    flushTyping();
+    updateMatches();
+    revertMatchVisuals();
+    if ( softInput) softInput.value = "";
 }
