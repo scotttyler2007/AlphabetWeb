@@ -42,18 +42,24 @@ function updateUiScale() {
 function viewportW() { return Math.round( window.innerWidth); }
 function viewportH() { return Math.round( window.innerHeight); }
 
-// The sketch deliberately does NOT track the visual viewport. Everything
-// centres on the canvas, and the canvas is the whole page, so a soft keyboard
-// simply sits on top of the lower part of the artwork the way a hand would.
+// Where the typed phrase centres itself: the middle of the part of the page
+// still visible, which is half the screen once a soft keyboard is up.
 //
-// Reacting to the keyboard was tried and removed. Sizing the canvas to the
-// visible area left the strip beneath it painting the body's flat #020701
-// while the canvas painted bgCurrent, which reads as a dead band under the
-// artwork the moment a crayon is matched. Moving only the text instead still
-// left the canvas at the mercy of whatever the browser reported. Doing
-// nothing is both the simplest behaviour and the only one with no seam in it.
+// ONLY the phrase uses this. The canvas keeps its full size and the emoji
+// grid keeps its own positions, so the artwork stays exactly where it was and
+// the keyboard covers the lower part of it - the way a hand would. That
+// separation is the whole point: the earlier attempt shrank the canvas to the
+// visible area, which left the strip beneath it painting the body's flat
+// #020701 against the canvas's bgCurrent - a dead black band the moment a
+// crayon was matched. Moving text costs nothing; moving the canvas cost that.
+//
+// Clamped into the canvas because a browser can report an offsetTop or height
+// that puts the centre off the page, and a phrase drawn off-screen looks
+// exactly like a phrase that never got typed.
 function visibleCenterY() {
-    return height / 2;
+    const vv = window.visualViewport;
+    if ( !vv || !vv.height) return height / 2;
+    return Math.max( 0, Math.min( height, vv.offsetTop + vv.height / 2));
 }
 
 // Every path that changes the visible area funnels through here: p5's

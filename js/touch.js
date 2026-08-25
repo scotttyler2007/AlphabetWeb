@@ -55,7 +55,7 @@ function setupTouch() {
             }
         });
         softInput.addEventListener( "blur", function () {
-            softInput.value = currentText;
+            setSoftValue( currentText);
             // Best-effort catch-up for the one case the size comparison in
             // applyViewport() cannot see: a rotation *while* the keyboard is
             // up, which arrives as a width change measured against an already
@@ -82,13 +82,61 @@ function setupTouch() {
         cv.addEventListener( "touchmove", function ( e) { e.preventDefault(); }, { passive: false });
     }
 
-    // Nothing is bound to the visual viewport on purpose. The keyboard
-    // arriving is not a resize in any sense the sketch cares about - the page
-    // has not changed shape, part of it is simply covered - and every attempt
-    // to respond to it made things worse rather than better. The canvas keeps
-    // the size it had, the artwork keeps its place, and the keyboard sits on
-    // top. See applyViewport() in layout.js, which refuses keyboard-driven
-    // resizes even when the browser reports one.
+    // The visual viewport is watched for ONE thing: re-centring the phrase.
+    // Emphatically not applyViewport() - that would resize the canvas, which
+    // is the mistake that put a black band under the artwork. layoutTyping()
+    // only re-measures the text against visibleCenterY(); the canvas, the
+    // grid and every sprite are left exactly as they are.
+    //
+    // Needed because the keyboard can close while a phrase is on screen - the
+    // back button, or a swipe blurring the field - and the phrase should drop
+    // back to centre without waiting for the next keystroke to re-lay it out.
+    if ( window.visualViewport) {
+        window.visualViewport.addEventListener( "resize", layoutTyping);
+        window.visualViewport.addEventListener( "scroll", layoutTyping);
+    }
+}
+
+// Reading and writing the hidden field, isolated here because the field is a
+// contenteditable <div> rather than an <input>, and the two differ in three
+// ways that would otherwise be scattered through this file.
+//
+// It is a div because of the Android Autofill framework. Chrome registers
+// form controls with it, and the service then offers passwords, payment cards
+// and addresses on a strip above the keyboard - which on a children's typing
+// toy is both useless and the last thing anyone wants one tap away.
+// autocomplete="off" does not suppress it; Chrome honours that for its own
+// autofill, not for the platform service. A contenteditable element is not a
+// form control, so it is never registered and the strip has nothing to offer.
+//
+// To go back to an <input>, change the element in index.html - these two
+// functions already handle both shapes and nothing else reads the field.
+function softValue() {
+    if ( !softInput) return "";
+    // Newlines are possible in a contenteditable and not in an input; the
+    // return key is handled as Enter, so any that survive are stripped.
+    const raw = ( softInput.value !== undefined) ? softInput.value : softInput.textContent;
+    return raw.replace( /[\r\n]/g, "");
+}
+
+function setSoftValue( text) {
+    if ( !softInput) return;
+    if ( softInput.value !== undefined) { softInput.value = text; return; }
+    if ( softInput.textContent === text) return;
+
+    softInput.textContent = text;
+
+    // Setting textContent drops the caret to the start of the node, so the
+    // next keystroke would insert at the FRONT of the word. An <input> puts it
+    // at the end for free; a div has to be told. Only while focused, so this
+    // never steals a selection from elsewhere on the page.
+    if ( document.activeElement !== softInput) return;
+    const range = document.createRange();
+    range.selectNodeContents( softInput);
+    range.collapse( false);              // false == to the end
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange( range);
 }
 
 // Raises the keyboard. Only works from inside a real user gesture, which is
@@ -96,7 +144,7 @@ function setupTouch() {
 // a timer and never at load.
 function showSoftKeyboard() {
     if ( !softInput) return;
-    softInput.value = currentText;   // start in step with what is on screen
+    setSoftValue( currentText);      // start in step with what is on screen
     softInput.focus();
 }
 
@@ -114,7 +162,7 @@ function onSoftInput() {
     // every later tap falling into the "open the keyboard" branch instead of
     // Enter or clear. The field is re-synced rather than read.
     if ( document.activeElement !== softInput) {
-        softInput.value = currentText;
+        setSoftValue( currentText);
         lastGesture = "input ignored (not focused)";
         return;
     }
@@ -122,7 +170,7 @@ function onSoftInput() {
     // The return key never reaches here - a single-line input cannot hold a
     // newline - and is handled by the keydown and beforeinput listeners in
     // setupTouch() instead.
-    syncBufferTo( softInput.value);
+    syncBufferTo( softValue());
 }
 
 // The same character gate keyPressed() applies, enforced here too because a
@@ -145,7 +193,7 @@ function syncBufferTo( raw) {
     // Push the filtered result back if anything was dropped, so the field and
     // the buffer stay identical. Otherwise the next reconcile would compare
     // against characters the sketch refused and try to re-type them forever.
-    if ( softInput && softInput.value !== text) softInput.value = text;
+    if ( softInput && softValue() !== text) setSoftValue( text);
     if ( text === currentText) return;
 
     let keep = 0;
@@ -247,7 +295,7 @@ function onTouchEnd( e) {
     // swipe pops the keyboard back over the emoji the swipe just went looking
     // for. Dropping focus is what actually keeps a hidden keyboard hidden.
     if ( softInput) {
-        softInput.value = currentText;
+        setSoftValue( currentText);
         softInput.blur();
     }
 }
@@ -278,5 +326,5 @@ function onTap() {
     flushTyping();
     updateMatches();
     revertMatchVisuals();
-    if ( softInput) softInput.value = "";
+    setSoftValue( "");
 }

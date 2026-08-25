@@ -153,6 +153,20 @@ the buffer against the field's value on every `input` event. That reconcile assu
 nothing about how much changed, which is what makes autocorrect, prediction and
 paste behave like ordinary typing.
 
+**The hidden field is a `contenteditable` div, not an `<input>`.** Chrome registers
+form controls with the Android Autofill framework, and the autofill service then
+offers saved passwords, payment cards and addresses on a strip above the keyboard —
+useless on a children's typing toy and the last thing that should sit one tap away.
+`autocomplete="off"` does not suppress it: Chrome honours that for its own autofill,
+not for the platform service. A contenteditable element is not a form control, is
+never registered, and the strip has nothing to offer.
+
+It costs two things, both handled in `softValue()` / `setSoftValue()`: a div can hold
+newlines where an input cannot, and rewriting its text drops the caret to the *start*
+so the next keystroke would insert at the front of the word. Changing the element in
+`index.html` back to an `<input type="text">` is a one-line revert — those two
+functions already handle either shape and nothing else touches the field.
+
 **The touch control surface is deliberately smaller than the desktop one.** A phone
 has no arrow keys, no Enter, no Delete and no End, and hiding four more actions
 behind long-presses and multi-finger taps would make them undiscoverable rather than
@@ -175,13 +189,17 @@ DELETE (disperse + next font) and HOME (toggle combined emoji sets) have no touc
 equivalent. Both are refinements rather than core actions, and the concession buys an
 interface with two gestures instead of six.
 
-**Nothing responds to the soft keyboard.** The canvas is sized to the page and stays
-that size; the keyboard simply covers the lower part of the artwork, the way a hand
-would. Two earlier attempts to be clever both made it worse — sizing the canvas to
+**The soft keyboard moves the text and nothing else.** The canvas keeps its full
+size and the emoji grid keeps its own positions, so the artwork stays put and the
+keyboard covers the lower part of it the way a hand would; only the typed phrase
+re-centres, on `visibleCenterY()`, so the word never hides behind the keyboard.
+
+That split is the whole lesson from getting it wrong twice. Sizing the *canvas* to
 the visible area left a strip beneath it painting the body's flat `#020701` against
-the canvas's `bgCurrent`, which reads as a dead black band the moment a crayon is
-matched, and moving only the text still left the canvas at the mercy of whatever the
-browser reported. Doing nothing is the only version with no seam in it.
+the canvas's `bgCurrent` — a dead black band the moment a crayon is matched. Moving
+*text* costs nothing, because text is redrawn every frame anyway and the grid never
+consults it. So `applyViewport()` still refuses keyboard-driven resizes outright,
+and the only thing bound to the visual viewport is `layoutTyping()`.
 
 Two things enforce that. `#softInput` sits at `top: 0`, because Chrome scrolls a
 focused input into view and a field pinned to the bottom is exactly what the keyboard
