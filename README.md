@@ -94,6 +94,26 @@ To check what your host actually sends:
 curl -sI https://your-site.example/js/sketch.js
 ```
 
+## Checking what you're actually running
+
+A build watermark sits in the bottom-right corner — `v08-24 20:02`, read straight
+off the `?v=` token on the script tags. It is not a hand-maintained number, so it
+cannot drift from what shipped: **if the stamp shows an old timestamp, the page is
+old.** That matters most on a phone, where there is no easy way to inspect the
+network tab and where a stale cached bundle is indistinguishable from a fix that
+did not work.
+
+Add `?debug` to the URL for a live state readout beside it — buffer contents and
+length, current and shown match, `hasNewMatch()`, what the last gesture resolved to,
+whether the keyboard has focus, canvas and viewport sizes, and the live grid count.
+That is the fastest way to tell *why* a tap did what it did:
+
+```
+https://scotttyler2007.github.io/AlphabetWeb/?debug
+```
+
+Both are `pointer-events: none`, so neither can ever swallow a tap.
+
 ## How it's organized
 
 One JS file per Processing tab, loaded as classic `<script>` tags in dependency order

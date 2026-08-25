@@ -22,6 +22,7 @@
 
 let softInput = null;        // the hidden field; stays null on desktop
 let touchStart = null;       // {x, y, t} of the touch currently down
+let lastGesture = "none";    // what the last touch resolved to, for the debug readout
 
 // Coarse pointer, not screen width: a narrow desktop window is still a
 // desktop, and a large tablet still needs the soft keyboard. matchMedia asks
@@ -70,6 +71,14 @@ function setupTouch() {
         // fight the sketch instead of driving it.
         cv.addEventListener( "touchstart", onTouchStart, { passive: false });
         cv.addEventListener( "touchend", onTouchEnd, { passive: false });
+        // A gesture the browser takes away from us - the keyboard animating,
+        // a system edge swipe - arrives as touchcancel and never as touchend.
+        // Without this the stale start point survives, and the NEXT touch is
+        // measured from it: a tap gets scored as a swipe, or vice versa.
+        cv.addEventListener( "touchcancel", function () {
+            touchStart = null;
+            lastGesture = "cancelled";
+        }, { passive: false });
         cv.addEventListener( "touchmove", function ( e) { e.preventDefault(); }, { passive: false });
     }
 
@@ -97,9 +106,21 @@ function showSoftKeyboard() {
 // backspace, an autocorrect swapping a whole word, and a paste all reduce to
 // the same two loops.
 function onSoftInput() {
-    // Just the value. The return key never reaches here - a single-line
-    // input cannot hold a newline, so the browser drops it before this
-    // runs - and is handled by the keydown and beforeinput listeners in
+    // Only while the field actually has focus. An Android IME commits its
+    // composition when the field is blurred, and that commit arrives here as
+    // an ordinary input event carrying whatever the IME thought it was
+    // holding - often nothing. Acting on it wipes the buffer at the exact
+    // moment a swipe just filled it, which leaves typing.length at 0 and
+    // every later tap falling into the "open the keyboard" branch instead of
+    // Enter or clear. The field is re-synced rather than read.
+    if ( document.activeElement !== softInput) {
+        softInput.value = currentText;
+        lastGesture = "input ignored (not focused)";
+        return;
+    }
+
+    // The return key never reaches here - a single-line input cannot hold a
+    // newline - and is handled by the keydown and beforeinput listeners in
     // setupTouch() instead.
     syncBufferTo( softInput.value);
 }
@@ -204,6 +225,7 @@ function onTouchEnd( e) {
         onTap();
         return;
     }
+    lastGesture = "swipe dx=" + Math.round( dx) + " dy=" + Math.round( dy);
 
     // Dominant axis wins outright, so a sloppy diagonal does one thing rather
     // than both.
@@ -234,14 +256,18 @@ function onTouchEnd( e) {
 // gesture carries three meanings and how they cycle.
 function onTap() {
     if ( typing.length === 0) {
+        lastGesture = "tap -> keyboard (buffer empty)";
         showSoftKeyboard();
         return;
     }
 
     if ( hasNewMatch()) {
+        lastGesture = "tap -> enter";
         confirmMatch();
         return;
     }
+
+    lastGesture = "tap -> clear";
 
     // Nothing left to stage, so this tap is the clear. Unlike desktop's END -
     // which only reverts the visuals and leaves the phrase up - this also

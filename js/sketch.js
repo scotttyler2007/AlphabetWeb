@@ -72,6 +72,10 @@ function setup() {
     // keydown path below is untouched. See touch.js for why a phone needs a
     // hidden input rather than just listening harder to keydown.
     setupTouch();
+
+    // Build watermark, and the ?debug readout when asked for. Last, so it can
+    // report on everything the calls above just set up.
+    setupDebug();
     //
     // setupSound() is gone too: it only ever built the fixed SinOsc/Env
     // voice pool that config.js's SOUND_VOICES used to size, and that
