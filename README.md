@@ -29,8 +29,9 @@ DevTools is open).
 
 It's plain static files with no build step, so any static host works — GitHub Pages,
 Cloudflare Pages, Netlify. Upload `index.html`, `js/`, `fonts/` and the two
-`favicon.*` files — the whole `fonts/` folder, including `OFL.txt`, which the font
-license requires travel with the files. `favicon.ico` belongs at the site root,
+`favicon.*` files, plus `manifest.webmanifest` and `icon-192.png` / `icon-512.png`
+for the home-screen install — the whole `fonts/` folder, including `OFL.txt`, which
+the font license requires travel with the files. `favicon.ico` belongs at the site root,
 where browsers look for it whether or not they read the `<link>` tags. p5.js loads
 from a pinned CDN (`p5@1.11.3`); vendor it locally if you'd rather not depend on
 jsdelivr.
@@ -152,6 +153,24 @@ predicted rather than typed — so anything reading keydown loses most Android i
 the buffer against the field's value on every `input` event. That reconcile assumes
 nothing about how much changed, which is what makes autocorrect, prediction and
 paste behave like ordinary typing.
+
+**Fullscreen on mobile, by two routes, because one is not enough.** Android Chrome
+honours the Fullscreen API, so the start-overlay tap asks for it — that tap is a real
+user gesture, which the API requires, and it is the only place it is called from.
+iOS Safari exposes the API for `<video>` only and refuses it for anything else, so a
+page simply cannot ask; the route there is **Add to Home Screen**, which
+`manifest.webmanifest` plus the `apple-mobile-web-app-*` meta tags make launch with
+no browser UI at all. Both routes are worth having: Android gets fullscreen with no
+install, iOS gets it with one.
+
+Desktop takes the same route: the start-overlay click asks for fullscreen there too,
+so the sketch fills the screen on every device rather than only on a phone.
+
+One interaction needed care. *Leaving* fullscreen shrinks the height with the width
+unchanged — exactly the shape `applyViewport()` throws away as a soft keyboard. The
+`fullscreenchange` handler therefore forces it through, and without that the canvas
+would stay taller than the window with the emoji grid centred below where the screen
+now ends.
 
 **The hidden field is a `contenteditable` div, not an `<input>`.** Chrome registers
 form controls with the Android Autofill framework, and the autofill service then

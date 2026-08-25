@@ -72,6 +72,7 @@ function setup() {
     // keydown path below is untouched. See touch.js for why a phone needs a
     // hidden input rather than just listening harder to keydown.
     setupTouch();
+    setupViewport();  // layout.js - fullscreen transitions, all devices
 
     // Build watermark, and the ?debug readout when asked for. Last, so it can
     // report on everything the calls above just set up.

@@ -95,6 +95,7 @@ function setupTouch() {
         window.visualViewport.addEventListener( "resize", layoutTyping);
         window.visualViewport.addEventListener( "scroll", layoutTyping);
     }
+
 }
 
 // Reading and writing the hidden field, isolated here because the field is a
@@ -137,6 +138,29 @@ function setSoftValue( text) {
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange( range);
+}
+
+// Asks for real fullscreen - no URL bar, no system navigation strip, and on
+// desktop no window chrome either. Like raising the keyboard, this only works
+// from inside a user gesture, so it is called from the start overlay tap and
+// nowhere else.
+//
+// Android Chrome honours this. iOS Safari does not: it exposes the Fullscreen
+// API for <video> only, and rejects it for anything else. There is no way to
+// force it from a page, which is why the manifest and the apple-* meta tags
+// exist - adding the sketch to the home screen is the iOS route to the same
+// place, and it needs no gesture at all.
+//
+// Failure is expected and silent. A rejected promise here means the browser
+// said no, which is not an error the sketch can or should do anything about.
+function requestFullscreenIfPossible() {
+    const el = document.documentElement;
+    const go = el.requestFullscreen || el.webkitRequestFullscreen;
+    if ( !go) return;
+    try {
+        const r = go.call( el, { navigationUI: "hide" });
+        if ( r && r.catch) r.catch( function () {});
+    } catch ( e) { /* refused; the page simply stays windowed */ }
 }
 
 // Raises the keyboard. Only works from inside a real user gesture, which is

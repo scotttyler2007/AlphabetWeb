@@ -66,7 +66,10 @@ function visibleCenterY() {
 // windowResized(), a device rotation, and the soft keyboard opening or
 // closing. Order matters - the scale has to be current before the grid and
 // the phrase re-derive their geometry from it.
-function applyViewport() {
+// force skips the keyboard test below. Used for fullscreen transitions, whose
+// shrink-on-exit is indistinguishable from a keyboard by size alone but is a
+// real change to how much page there is.
+function applyViewport( force) {
     const w = viewportW();
     const h = viewportH();
 
@@ -84,12 +87,25 @@ function applyViewport() {
     // itself has focus, and the blur event that would pair with it does not
     // fire at all in an unfocused document. Comparing the two sizes needs no
     // events and cannot get out of step.
-    if ( isTouch && w === width && h < height) return;
+    if ( !force && isTouch && w === width && h < height) return;
 
     resizeCanvas( w, h);
     updateUiScale();
     rebuildGrid();   // emojiGrid.js - positions, per-cell arrays and sprite sizes
     layoutTyping();  // typingBuffer.js - re-centres the phrase being typed
+}
+
+// Registered for every device, not just touch, because the sketch asks for
+// fullscreen on both now.
+//
+// Entering fullscreen grows the page and leaving it shrinks the page back, and
+// that shrink has exactly the shape applyViewport() throws away as a soft
+// keyboard: same width, less height. So the transition is forced through.
+// Without it, leaving fullscreen on a phone would leave a canvas taller than
+// the window with the emoji grid centred below where the screen now ends.
+function setupViewport() {
+    document.addEventListener( "fullscreenchange", function () { applyViewport( true); });
+    document.addEventListener( "webkitfullscreenchange", function () { applyViewport( true); });
 }
 
 // Latched once at startup rather than asked each time: the answer cannot
