@@ -39,22 +39,24 @@ function buildGridPositions() {
     if ( gridPositionsBuilt) return;
     gridPositionsBuilt = true;
 
-    const rowHeight = emojiGridSpacing * 0.87; // ~sqrt(3)/2 for hex packing
-    const left   = -emojiOverscan;
-    const right  = width + emojiOverscan;
-    const top    = -emojiOverscan;
-    const bottom = height + emojiOverscan;
+    const spacing = emojiGridSpacing * uiScale;
+    const overscan = emojiOverscan * uiScale;
+    const rowHeight = spacing * 0.87; // ~sqrt(3)/2 for hex packing
+    const left   = -overscan;
+    const right  = width + overscan;
+    const top    = -overscan;
+    const bottom = height + overscan;
 
     const maxRow = ceil( (bottom - height/2.0) / rowHeight) + 1;
-    const maxCol = ceil( (right - width/2.0) / emojiGridSpacing) + 1;
+    const maxCol = ceil( (right - width/2.0) / spacing) + 1;
 
     for ( let r = -maxRow; r <= maxRow; r++) {
         const y = height/2 + r * rowHeight;
         if ( y < top || y > bottom) continue;
         const oddRow = ( ( (r % 2) + 2) % 2) === 1;
-        const xOffset = oddRow ? emojiGridSpacing/2 : 0;
+        const xOffset = oddRow ? spacing/2 : 0;
         for ( let c = -maxCol; c <= maxCol; c++) {
-            const x = width/2 + c * emojiGridSpacing + xOffset;
+            const x = width/2 + c * spacing + xOffset;
             if ( x < left || x > right) continue;
             gridPositions.push( createVector( x, y));
         }
@@ -71,7 +73,13 @@ function rebuildGrid() {
     gridPositions.length = 0;
     gridPositionsBuilt = false;
     buildGridPositions();
-    for ( const grid of emojiGrids) grid.rebuildCells();
+    for ( const grid of emojiGrids) {
+        // Sprites are bitmaps burned at a fixed pixel size, so a rotation or
+        // a soft keyboard opening - anything that moves uiScale - leaves them
+        // sized for the old screen until they are painted again.
+        grid.sprites = buildEmojiSprites( grid.emojiSet);
+        grid.rebuildCells();
+    }
 }
 
 function spawnEmojiGrid( emojiSet) {
@@ -118,6 +126,7 @@ function dimTargetFor( p, s) {
 
 class EmojiGrid {
     constructor( emojiSet) {
+        this.emojiSet = emojiSet;   // kept so a scale change can re-rasterize
         this.sprites = buildEmojiSprites( emojiSet);
         this.alpha = 0;
         this.alphaTarget = 1; // instances are always created already fading in
@@ -239,7 +248,7 @@ class EmojiGrid {
 // provide for variation-selector sequences.
 function buildEmojiSprites( emojiSet) {
     const dpr = window.devicePixelRatio || 1;
-    const font = `${emojiSize}px ${EMOJI_FONT_STACK}`;
+    const font = `${Math.round( emojiSize * uiScale)}px ${EMOJI_FONT_STACK}`;
 
     const probe = document.createElement( 'canvas').getContext( '2d');
     probe.font = font;
@@ -257,8 +266,8 @@ function buildEmojiSprites( emojiSet) {
         // slightly loose sprite rather than a zero-sized one.
         const bl = m.actualBoundingBoxLeft    ?? 0;
         const br = m.actualBoundingBoxRight   ?? m.width;
-        const ba = m.actualBoundingBoxAscent  ?? emojiSize * 0.8;
-        const bd = m.actualBoundingBoxDescent ?? emojiSize * 0.2;
+        const ba = m.actualBoundingBoxAscent  ?? emojiSize * uiScale * 0.8;
+        const bd = m.actualBoundingBoxDescent ?? emojiSize * uiScale * 0.2;
 
         const w = Math.max( 1, Math.ceil( bl + br) + SPRITE_PAD * 2);
         const h = Math.max( 1, Math.ceil( ba + bd) + SPRITE_PAD * 2);

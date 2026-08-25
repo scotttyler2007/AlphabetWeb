@@ -177,7 +177,11 @@ function layoutTyping() {
     }
 
     useFont(font);
-    textSize(bigSize);
+    // One local, used for the glyph size, the line height and the box
+    // heights below, so the three can never disagree about how big a line
+    // actually is on this screen.
+    const size = bigSize * uiScale;
+    textSize(size);
     const maxWidth = width * 0.85;
 
     const lines = [];
@@ -217,7 +221,7 @@ function layoutTyping() {
     }
     lines.push(currentLine);
 
-    const lineHeight = bigSize * 0.95;
+    const lineHeight = size * 0.95;
     const totalHeight = lines.length * lineHeight;
     const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
 
@@ -239,9 +243,9 @@ function layoutTyping() {
             x += cw;
         }
 
-        // Letters are drawn centered on y at textSize(bigSize), so the line
+        // Letters are drawn centered on y at textSize(size), so the line
         // occupies a full em vertically - a little taller than the glyphs
         // themselves, which gives the box some natural slack.
-        typedTextBoxes.push({ x1: left, y1: y - bigSize / 2, x2: left + w, y2: y + bigSize / 2 });
+        typedTextBoxes.push({ x1: left, y1: y - size / 2, x2: left + w, y2: y + size / 2 });
     }
 }

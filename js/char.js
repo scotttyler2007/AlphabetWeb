@@ -14,7 +14,9 @@ class Char {
         this.age = 0;
         this.fadeTimer = startFade;
         this.dispersing = false;
-        this.baseSize = bigSize;
+        // Frozen at construction, so a letter already flying keeps the size
+        // it was born at even if the window resizes mid-flight.
+        this.baseSize = bigSize * uiScale;
     }
 
     setTarget(x, y) {

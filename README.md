@@ -115,13 +115,34 @@ line-by-line translation rather than a rewrite.
 | `js/sound.js` | `Sound.pde` |
 | `js/sketch.js` | `sketch.pde` |
 
+`js/layout.js` and `js/touch.js` have no Processing counterpart — screen scaling and
+touch input are problems a fullscreen desktop sketch never had. See the notes below.
+
 `fonts/` has no Processing counterpart — the original used `createFont()` against
 whatever was installed on the machine. See [fonts/README.md](fonts/README.md).
 
 ## Known differences from the Processing original
 
-**Desktop only.** The sketch is entirely keyboard-driven and there is no touch or
-soft-keyboard support yet, so it does nothing useful on a phone.
+**Touch is supported, by a separate input path.** Desktop still runs entirely on
+`keyPressed()`. A phone cannot: there is no keyboard on screen until something
+focusable is focused by a real user gesture, and Android soft keyboards mostly
+report `keyCode 229` / `key: "Unidentified"` on keydown because the text is being
+predicted rather than typed — so anything reading keydown loses most Android input.
+`js/touch.js` therefore keeps a hidden `<input>`, focuses it on tap, and reconciles
+the buffer against the field's value on every `input` event. That reconcile assumes
+nothing about how much changed, which is what makes autocorrect, prediction and
+paste behave like ordinary typing.
+
+Swipes stand in for the arrow keys — up/down walks the crayons, left/right the
+keywords — and a tap asks for the keyboard back. Enter arrives either as a keydown
+or as a `beforeinput` with `insertLineBreak`; both are handled, because a
+single-line input silently discards the newline itself.
+
+**Sizes scale to the screen.** Every size in `config.js` was picked for a fullscreen
+desktop window — 180px letters fit two to a line on a 390px phone. `js/layout.js`
+derives a `uiScale` from the short edge and each size is multiplied by it where it
+is used, so `config.js` keeps stating the desktop baseline. Scaling is clamped at 1,
+so a large monitor looks exactly as it always did.
 
 **Emoji coverage varies by device** and that's accepted. Glyphs come from whatever
 emoji font the visitor's OS provides (Segoe UI Emoji / Apple Color Emoji / Noto Color

@@ -37,7 +37,11 @@ function setup() {
     // pipeline entirely - but still wants the plain default (Canvas2D)
     // renderer, not WEBGL, since that raw-context trick needs a 2D
     // context to exist.
-    createCanvas(windowWidth, windowHeight);
+    // Sized from the VISIBLE viewport, not the window: on a phone with the
+    // soft keyboard open those differ, and the canvas wants the part that
+    // isn't covered. See layout.js.
+    createCanvas(viewportW(), viewportH());
+    updateUiScale();   // must precede setupEmoji() - the grid spacing reads it
     frameRate(60);
     colorMode(RGB, 1.0);
     textAlign(CENTER, CENTER);
@@ -63,6 +67,11 @@ function setup() {
     // Unlike loadFonts() this doesn't block - nothing is on screen to
     // mis-measure at startup, and preloadFonts() re-lays-out on arrival.
     preloadFonts();
+
+    // Touch devices only; on desktop this returns immediately and the
+    // keydown path below is untouched. See touch.js for why a phone needs a
+    // hidden input rather than just listening harder to keydown.
+    setupTouch();
     //
     // setupSound() is gone too: it only ever built the fixed SinOsc/Env
     // voice pool that config.js's SOUND_VOICES used to size, and that
@@ -98,9 +107,10 @@ function draw() {
 // grid positions, and the typed phrase's centered layout all need to
 // re-derive themselves against the new width/height.
 function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
-    rebuildGrid();  // emojiGrid.js - clears and rebuilds gridPositions for the new size
-    layoutTyping(); // re-centers the phrase currently being typed
+    // One shared path (layout.js), because a rotation, a desktop window drag
+    // and a soft keyboard opening all have to do the same four things in the
+    // same order - and only the first of those arrives as windowResized().
+    applyViewport();
 }
 
 // What may enter the typing buffer. Letters and digits are the point of the
@@ -113,8 +123,11 @@ function windowResized() {
 // refused. None of it can contribute to a match (tokenizing discards it), so
 // all it ever did was fill the screen with characters that dissolve into
 // nothing, and on a keyboard being mashed by a child that is most of them.
-// The hyphen sits last inside the class so it reads as a literal, not a range.
-const ALLOWED_CHAR = /^[A-Za-z0-9 -.!?']$/;
+// The hyphen MUST stay last inside the class. Written anywhere else it forms
+// a range with its neighbours - `[ -.]` is not "space, hyphen, period", it is
+// every character from 0x20 to 0x2E, which quietly readmits " !\"#$%&'()*+,-."
+// and undoes the whole gate.
+const ALLOWED_CHAR = /^[A-Za-z0-9 .!?'-]$/;
 
 // The subset of the above that can't lead: both are separators, and a buffer
 // opening with one has nothing to separate.

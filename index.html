@@ -1,6 +1,12 @@
 <title>Alphabet</title>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--
+  maximum-scale/user-scalable pin the zoom. On a full-screen canvas a
+  double-tap or pinch has nothing useful to zoom and everything to break -
+  it desyncs touch coordinates from where things are drawn. viewport-fit
+  keeps the canvas under the notch on phones that have one.
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 
 <!--
   Rainbow "A" on the sketch's own background. favicon.svg is the source of
@@ -38,9 +44,42 @@
     height: 100%;
     background: #020701;
     overflow: hidden;
+    /* Every drag on this page is a sketch gesture, never a scroll or a
+       pinch. Without touch-action a swipe pans the page instead of walking
+       the crayons, and overscroll-behavior stops the pull-to-refresh that
+       a downward swipe would otherwise trigger on Android. */
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   canvas {
     display: block;
+    touch-action: none;
+  }
+
+  /* The only way to get a soft keyboard on screen is to focus something
+     focusable, so this is a real input that happens to be invisible. It is
+     deliberately NOT display:none or visibility:hidden - neither can hold
+     focus, and without focus there is no keyboard.
+
+     font-size must stay >= 16px: below that, iOS Safari zooms the page when
+     the field takes focus, and the canvas visibly lurches. pointer-events is
+     off so it can never intercept a tap meant for the sketch; touch.js
+     focuses it programmatically instead. */
+  #softInput {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    outline: none;
+    opacity: 0;
+    font-size: 16px;
+    pointer-events: none;
+    z-index: 1;
   }
 
   /* Click-to-start overlay. Browsers block AudioContext until a user
@@ -79,16 +118,32 @@
     opacity: 0.8;
     margin: 0;
   }
+
+  /* The instructions differ by device, and the wrong half is worse than
+     none: a phone has no arrow keys to press and no mouse to click with.
+     Keyed off pointer coarseness rather than width, for the same reason
+     touch.js is - a narrow desktop window is still a desktop. */
+  .touchOnly { display: none; }
+  @media (pointer: coarse) {
+    .desktopOnly { display: none; }
+    .touchOnly { display: inline; }
+  }
 </style>
+
+<input id="softInput" type="text" autocomplete="off" autocorrect="off"
+       autocapitalize="none" spellcheck="false" enterkeyhint="go"
+       aria-hidden="true" tabindex="-1">
 
 <div id="startOverlay">
   <div class="prompt">
     <p class="headline">Just start typing.</p>
     <p class="detail">
       Type a crayon color or an emoji keyword and press Enter to see what
-      happens. Up/down arrows scroll through colors, left/right arrows
-      scroll through creatures (and everything else). Click, or press any
-      key, to begin.
+      happens. <span class="desktopOnly">Up/down arrows scroll through
+      colors, left/right arrows scroll through creatures (and everything
+      else). Click, or press any key, to begin.</span><span
+      class="touchOnly">Swipe up and down for colors, left and right for
+      creatures. Tap to begin.</span>
     </p>
   </div>
 </div>
@@ -107,6 +162,7 @@
 -->
 <script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
 <script src="js/config.js?v=202608140045"></script>
+<script src="js/layout.js?v=202608140045"></script>
 <script src="js/palette.js?v=202608140045"></script>
 <script src="js/keywords.js?v=202608140045"></script>
 <script src="js/theme.js?v=202608140045"></script>
@@ -115,6 +171,7 @@
 <script src="js/typingBuffer.js?v=202608140045"></script>
 <script src="js/emojiGrid.js?v=202608140045"></script>
 <script src="js/sound.js?v=202608140045"></script>
+<script src="js/touch.js?v=202608140045"></script>
 <script src="js/sketch.js?v=202608140045"></script>
 
 <script>
@@ -132,6 +189,11 @@
       if ( started) return;
       started = true;
       startAudio();
+      // Same gesture, second job: raising a soft keyboard also requires a
+      // real user gesture, so a phone gets its keyboard from this tap. On
+      // desktop showSoftKeyboard() is a no-op - setupTouch() never claimed
+      // the field - and the physical keyboard is already there.
+      if ( typeof showSoftKeyboard === 'function') showSoftKeyboard();
       overlay.classList.add( 'hidden');
       overlay.removeEventListener( 'click', dismiss);
       window.removeEventListener( 'keydown', dismiss);
