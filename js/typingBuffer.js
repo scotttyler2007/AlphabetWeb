@@ -223,9 +223,10 @@ function layoutTyping() {
 
     const lineHeight = size * 0.95;
     const totalHeight = lines.length * lineHeight;
-    // Centred on the VISIBLE middle, not the canvas middle: with a soft
-    // keyboard up those differ by half the keyboard, and the canvas middle
-    // is underneath it. See visibleCenterY() in layout.js.
+    // visibleCenterY() is the canvas middle - see layout.js, which explains
+    // why the sketch no longer tries to dodge the soft keyboard. Called
+    // through rather than inlined so that decision lives in exactly one
+    // place if the phrase ever needs to move again.
     const startY = visibleCenterY() - totalHeight / 2 + lineHeight / 2;
 
     typedTextBoxes.length = 0;

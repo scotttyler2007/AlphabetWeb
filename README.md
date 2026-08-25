@@ -155,15 +155,25 @@ DELETE (disperse + next font) and HOME (toggle combined emoji sets) have no touc
 equivalent. Both are refinements rather than core actions, and the concession buys an
 interface with two gestures instead of six.
 
-**The canvas covers the layout viewport, not the visible one.** These differ once a
-soft keyboard is up, and conflating them put a black band under the sketch on
-Android: sizing the canvas to the visible area leaves the strip beneath it showing
-the body's static `#020701` while the canvas paints `bgCurrent` — two different
-blacks the moment a crayon is matched. Only the typed phrase uses the visible
-rectangle, centring on `visibleCenterY()` so the word never hides behind the
-keyboard. Chrome for Android defaults to `interactive-widget=resizes-visual`, so
-`innerHeight` does not change when the keyboard opens, which also means no canvas
-resize and no grid rebuild on every keyboard toggle.
+**Nothing responds to the soft keyboard.** The canvas is sized to the page and stays
+that size; the keyboard simply covers the lower part of the artwork, the way a hand
+would. Two earlier attempts to be clever both made it worse — sizing the canvas to
+the visible area left a strip beneath it painting the body's flat `#020701` against
+the canvas's `bgCurrent`, which reads as a dead black band the moment a crayon is
+matched, and moving only the text still left the canvas at the mercy of whatever the
+browser reported. Doing nothing is the only version with no seam in it.
+
+Two things enforce that. `#softInput` sits at `top: 0`, because Chrome scrolls a
+focused input into view and a field pinned to the bottom is exactly what the keyboard
+covers — focusing it made the browser scroll the whole page up, dragging the canvas
+and exposing background below. And `applyViewport()` ignores a height-only shrink on
+touch devices, which is the shape a keyboard has on browsers that report it as a
+window resize at all; a rotation changes the width too, so it still gets through.
+
+That test is deliberately not keyed off `document.activeElement`. Focus looks like the
+obvious signal and is not one: it is only accurate while the document itself has
+focus, and the matching blur event does not fire at all in an unfocused document.
+Comparing the two sizes needs no events and cannot get out of step.
 
 **Sizes scale to the screen.** Every size in `config.js` was picked for a fullscreen
 desktop window — 180px letters fit two to a line on a 390px phone. `js/layout.js`

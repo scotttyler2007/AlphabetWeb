@@ -53,7 +53,14 @@ function setupTouch() {
                 softEnter();
             }
         });
-        softInput.addEventListener( "blur", function () { softInput.value = currentText; });
+        softInput.addEventListener( "blur", function () {
+            softInput.value = currentText;
+            // Best-effort catch-up for the one case the size comparison in
+            // applyViewport() cannot see: a rotation *while* the keyboard is
+            // up, which arrives as a width change measured against an already
+            // shrunken height. A no-op whenever nothing moved.
+            applyViewport();
+        });
     }
 
     const cv = document.querySelector( "canvas");
@@ -66,12 +73,13 @@ function setupTouch() {
         cv.addEventListener( "touchmove", function ( e) { e.preventDefault(); }, { passive: false });
     }
 
-    // The soft keyboard opening does not always resize the window (see
-    // layout.js), so the visual viewport is watched directly.
-    if ( window.visualViewport) {
-        window.visualViewport.addEventListener( "resize", applyViewport);
-        window.visualViewport.addEventListener( "scroll", applyViewport);
-    }
+    // Nothing is bound to the visual viewport on purpose. The keyboard
+    // arriving is not a resize in any sense the sketch cares about - the page
+    // has not changed shape, part of it is simply covered - and every attempt
+    // to respond to it made things worse rather than better. The canvas keeps
+    // the size it had, the artwork keeps its place, and the keyboard sits on
+    // top. See applyViewport() in layout.js, which refuses keyboard-driven
+    // resizes even when the browser reports one.
 }
 
 // Raises the keyboard. Only works from inside a real user gesture, which is

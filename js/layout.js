@@ -42,14 +42,18 @@ function updateUiScale() {
 function viewportW() { return Math.round( window.innerWidth); }
 function viewportH() { return Math.round( window.innerHeight); }
 
-// The VISUAL viewport is the part of that page the reader can still see with
-// a keyboard up. Only the typed phrase cares: it centres here rather than on
-// the canvas, so the word never hides behind the keyboard. offsetTop matters
-// because iOS can scroll the visual viewport within the layout one.
+// The sketch deliberately does NOT track the visual viewport. Everything
+// centres on the canvas, and the canvas is the whole page, so a soft keyboard
+// simply sits on top of the lower part of the artwork the way a hand would.
+//
+// Reacting to the keyboard was tried and removed. Sizing the canvas to the
+// visible area left the strip beneath it painting the body's flat #020701
+// while the canvas painted bgCurrent, which reads as a dead band under the
+// artwork the moment a crayon is matched. Moving only the text instead still
+// left the canvas at the mercy of whatever the browser reported. Doing
+// nothing is both the simplest behaviour and the only one with no seam in it.
 function visibleCenterY() {
-    const vv = window.visualViewport;
-    if ( !vv) return height / 2;
-    return vv.offsetTop + vv.height / 2;
+    return height / 2;
 }
 
 // Every path that changes the visible area funnels through here: p5's
@@ -60,16 +64,30 @@ function applyViewport() {
     const w = viewportW();
     const h = viewportH();
 
-    // Guarded, because this also fires every time the soft keyboard opens or
-    // closes, and that does not change the page size. Rebuilding the grid and
-    // re-rasterizing every sprite on each keyboard toggle would be pure waste.
-    if ( w !== width || h !== height) {
-        resizeCanvas( w, h);
-        updateUiScale();
-        rebuildGrid();   // emojiGrid.js - positions, per-cell arrays and sprite sizes
-    }
+    if ( w === width && h === height) return;   // nothing actually moved
 
-    // Always: the canvas may be the same size while the visible centre has
-    // moved, which is exactly the keyboard case.
-    layoutTyping();      // typingBuffer.js - re-centres the phrase being typed
+    // A soft keyboard, on the browsers that report it as a window resize at
+    // all, shows up as the height shrinking and nothing else. A rotation or a
+    // desktop window drag changes the width too. So a height-only shrink is
+    // taken as the keyboard and ignored outright: the page has not changed
+    // shape, part of it is simply covered, and shrinking the canvas to match
+    // is what left a strip of flat page background under the artwork.
+    //
+    // Deliberately not keyed off document.activeElement. Focus looks like the
+    // obvious signal and is not one - it is only accurate while the document
+    // itself has focus, and the blur event that would pair with it does not
+    // fire at all in an unfocused document. Comparing the two sizes needs no
+    // events and cannot get out of step.
+    if ( isTouch && w === width && h < height) return;
+
+    resizeCanvas( w, h);
+    updateUiScale();
+    rebuildGrid();   // emojiGrid.js - positions, per-cell arrays and sprite sizes
+    layoutTyping();  // typingBuffer.js - re-centres the phrase being typed
 }
+
+// Latched once at startup rather than asked each time: the answer cannot
+// change for the life of the page, and applyViewport() must not depend on
+// touch.js having run.
+const isTouch = window.matchMedia( "(pointer: coarse)").matches ||
+                ( "ontouchstart" in window && navigator.maxTouchPoints > 0);
