@@ -301,13 +301,19 @@ function onTouchEnd( e) {
 
     // Dominant axis wins outright, so a sloppy diagonal does one thing rather
     // than both.
+    // A swipe drags the LIST, it does not move a cursor along it. Pulling
+    // left hauls the next entry in from the right, the way a photo roll or a
+    // carousel behaves, so the direction of travel matches the direction the
+    // content appears to move. Reading it the other way round - swipe right,
+    // advance right - is the arrow-key model, and on a touchscreen it feels
+    // backwards because nothing on screen is moving the way your finger is.
     if ( Math.abs( dx) > Math.abs( dy)) {
         if ( Math.abs( dx) < SWIPE_MIN_PX) return;
-        emojiIndex = wrapIndex( emojiIndex, ( dx > 0) ? 1 : -1, keywords.length);
+        emojiIndex = wrapIndex( emojiIndex, ( dx > 0) ? -1 : 1, keywords.length);
         setBufferToWord( keywords[ emojiIndex].name);
     } else {
         if ( Math.abs( dy) < SWIPE_MIN_PX) return;
-        colorIndex = wrapIndex( colorIndex, ( dy > 0) ? 1 : -1, crayons.length);
+        colorIndex = wrapIndex( colorIndex, ( dy > 0) ? -1 : 1, crayons.length);
         setBufferToWord( crayons[ colorIndex].name);
     }
 

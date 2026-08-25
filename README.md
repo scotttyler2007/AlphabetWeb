@@ -191,9 +191,12 @@ has no arrow keys, no Enter, no Delete and no End, and hiding four more actions
 behind long-presses and multi-finger taps would make them undiscoverable rather than
 available. Touch gets two gestures:
 
-- **Swipe** — the arrow keys. Up/down walks the crayons, left/right the keywords. It
-  never raises the keyboard, and drops it if it is up: swiping is a browsing gesture,
-  and summoning a keyboard over the artwork you went looking for is backwards.
+- **Swipe** — the arrow keys. Up/down walks the crayons, left/right the keywords. A
+  swipe drags the *list*, it does not move a cursor along it: pulling left hauls the
+  next entry in from the right, the way a photo roll does, so the content moves the
+  way your finger does. It never raises the keyboard, and drops it if it is up —
+  swiping is a browsing gesture, and summoning a keyboard over the artwork you went
+  looking for is backwards.
 - **Tap** — one control whose meaning follows the buffer, which is what lets a single
   gesture cover Enter, clear *and* reopening the keyboard with no on-screen buttons:
   nothing typed → open the keyboard; something to stage → Enter; already staged →
