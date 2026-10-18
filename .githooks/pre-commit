@@ -1,0 +1,5 @@
+#!/bin/sh
+# Bump the ?v= cache token in index.html on every commit, so each push gives
+# users fresh files without a manual step. See "Caching" in README.md.
+sed -i "s/?v=[0-9][0-9]*/?v=$(date +%Y%m%d%H%M)/g" index.html
+git add index.html

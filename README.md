@@ -63,8 +63,9 @@ asset URL in `index.html` carries a `?v=` token:
 ```
 
 A changed URL is a different cache entry, so whenever the new HTML lands, every file
-it names is fetched fresh together. **Bump the token as part of deploying** — run this
-from the project root before you push:
+it names is fetched fresh together. **Commits bump the token automatically** via
+`.githooks/pre-commit`; enable it once per clone with
+`git config core.hooksPath .githooks`. To bump by hand, run this from the project root:
 
 ```bash
 sed -i "s/?v=[0-9][0-9]*/?v=$(date +%Y%m%d%H%M)/g" index.html
