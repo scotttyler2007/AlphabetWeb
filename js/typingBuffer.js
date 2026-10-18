@@ -128,6 +128,7 @@ function popTypingChar() {
 // Draws already-dispersed letters first, then the word currently being
 // typed, so the typed word is never occluded by anything behind it.
 function drawTypedChars() {
+    updateHover();
     for (const c of chars) c.show();
     for (const c of typing) c.show();
 }
@@ -221,8 +222,82 @@ function layoutTyping() {
     }
     lines.push(currentLine);
 
+    // Wrapping is decided here, from unscaled widths, and then frozen: hover
+    // only changes spacing within a line, never which letters share one.
+    // baseSize is frozen when a Char is born (so dispersing letters keep
+    // theirs), but letters still in the phrase must follow uiScale: widths
+    // are measured at the current size, and drawing them at an older one
+    // leaves gaps or overlaps after a resize.
+    for (const c of typing) {
+        c.baseSize = size;
+        c.w = textWidth(c.character);
+    }
+    typedLines = lines;
+    typedLineSize = size;
+    assignSoundGroups();
+    lastHoveredGroup = -1e9;   // group numbers just changed meaning; re-evaluate
+    placeTyping();
+}
+
+// Letter combinations that make one sound, longest first so "tch" wins over
+// "ch". Hovering any letter of a match emphasizes the whole match.
+const SOUND_GROUPS = [
+    "tch", "igh", "sh", "ch", "th", "ph", "wh", "ck", "ng", "qu", "kn", "wr", "gh", "tr", "fl", "st",
+    "ee", "oo", "ea", "ai", "ay", "oa", "oi", "oy", "ou", "ow",
+    "ar", "er", "ir", "or", "ur",
+];
+// "ti" only says "sh" before these endings (combination, nation, patient),
+// so it isn't grouped in "tiger" or "time".
+const TI_ENDINGS = /^ti(on|al|ous|ent|ence|ance)/;
+
+// Tags every typed letter with c.group, a number shared by the letters that
+// form one sound. Letters on their own get a unique number, so hover treats
+// them exactly as before.
+function assignSoundGroups() {
+    let id = 0;
+    let i = 0;
+    while (i < typing.length) {
+        let len = 1;
+        if (typing[i].character !== " ") {
+            // The rest of this word, lowercased, for matching.
+            let rest = "";
+            for (let k = i; k < typing.length && typing[k].character !== " "; k++) {
+                rest += typing[k].character.toLowerCase();
+            }
+            // Word-final "le" after a consonant (turtle, table), not "letter".
+            const prev = i > 0 ? typing[i - 1].character.toLowerCase() : "";
+            if (TI_ENDINGS.test(rest)) len = 2;
+            else if (rest === "le" && /[b-df-hj-np-tv-z]/.test(prev)) len = 2;
+            else {
+                for (const g of SOUND_GROUPS) {
+                    if (rest.startsWith(g)) { len = g.length; break; }
+                }
+            }
+        }
+        for (let k = 0; k < len; k++) typing[i + k].group = id;
+        id++;
+        i += len;
+    }
+}
+
+// Hover emphasis. The hovered letter grows by HOVER_BOOST and every letter's
+// advance grows with its own scale, so neighbours slide apart instead of
+// overlapping. Each line is re-centred on the scaled total, which keeps the
+// phrase centred while the hovered letter swells.
+const HOVER_BOOST = 0.6;
+const HOVER_MS = 180;   // every hover animation takes exactly this long
+let lastHoveredGroup = -1e9;   // matches nothing, so the first frame always evaluates
+let hoverStart = 0;
+
+let typedLines = [];      // indices into typing[], one array per wrapped line
+let typedLineSize = 0;
+
+// Positions every letter from its width and current hover scale. Cheap (no
+// text measuring), so it runs every frame while a hover is animating.
+function placeTyping() {
+    const size = typedLineSize;
     const lineHeight = size * 0.95;
-    const totalHeight = lines.length * lineHeight;
+    const totalHeight = typedLines.length * lineHeight;
     // visibleCenterY() is the canvas middle - see layout.js, which explains
     // why the sketch no longer tries to dodge the soft keyboard. Called
     // through rather than inlined so that decision lives in exactly one
@@ -230,20 +305,39 @@ function layoutTyping() {
     const startY = visibleCenterY() - totalHeight / 2 + lineHeight / 2;
 
     typedTextBoxes.length = 0;
-    for (let li = 0; li < lines.length; li++) {
-        const idxs = lines[li];
+    for (let li = 0; li < typedLines.length; li++) {
+        const idxs = typedLines[li];
         const y = startY + li * lineHeight;
         if (idxs.length === 0) continue;   // a wrap can leave a trailing empty line
 
-        let w = 0;
-        for (const idx of idxs) w += textWidth(typing[idx].character);
-        const left = width / 2 - w / 2;
+        // Unscaled slots are what the mouse is tested against, so a letter
+        // growing under the cursor can't pull the cursor onto its neighbour.
+        let w0 = 0, w = 0;
+        for (const idx of idxs) {
+            w0 += typing[idx].w;
+            w += typing[idx].w * typing[idx].hoverScale();
+        }
+        // The slide-in target uses these unscaled slots; the hover shift is
+        // kept separately in hoverDx and added at draw time. Folding it into
+        // the target would send it through Char.update()'s exponential lerp,
+        // which settles at a different pace for every letter and shows up as
+        // a shuffle at the end of the animation.
+        let slotX = width / 2 - w0 / 2;
+        for (const idx of idxs) {
+            const c = typing[idx];
+            c.slotX1 = slotX;
+            c.slotX2 = slotX + c.w;
+            c.slotY = y;
+            c.setTarget(slotX + c.w / 2, y);
+            slotX += c.w;
+        }
 
+        const left = width / 2 - w / 2;
         let x = left;
         for (const idx of idxs) {
             const c = typing[idx];
-            const cw = textWidth(c.character);
-            c.setTarget(x + cw / 2, y);
+            const cw = c.w * c.hoverScale();
+            c.hoverDx = (x + cw / 2) - (c.slotX1 + c.w / 2);
             x += cw;
         }
 
@@ -252,4 +346,47 @@ function layoutTyping() {
         // themselves, which gives the box some natural slack.
         typedTextBoxes.push({ x1: left, y1: y - size / 2, x2: left + w, y2: y + size / 2 });
     }
+}
+
+// Called once per frame before the letters draw: eases each letter's hover
+// amount toward 1 (under the mouse) or 0, and re-spaces the line if any moved.
+function updateHover() {
+    if (typing.length === 0 || isTouch) return;
+    const half = typedLineSize / 2;
+    // Holding Ctrl emphasizes just the letter under the mouse, for pointing
+    // at a single letter inside a combination. A single letter is keyed by
+    // its negative index (below -1) so it can't collide with a group number.
+    const single = keyIsDown(CONTROL);
+    let hoveredGroup = -1;
+    for (let i = 0; i < typing.length; i++) {
+        const c = typing[i];
+        if (c.slotX2 !== undefined &&
+            mouseX >= c.slotX1 && mouseX < c.slotX2 &&
+            Math.abs(mouseY - c.slotY) < half) {
+            hoveredGroup = single ? -2 - i : c.group;
+            break;
+        }
+    }
+
+    const now = millis();
+    // One shared clock: whenever the hovered group changes, every letter
+    // restarts from where it currently is and they all finish together.
+    if (hoveredGroup !== lastHoveredGroup) {
+        lastHoveredGroup = hoveredGroup;
+        hoverStart = now;
+        for (let i = 0; i < typing.length; i++) {
+            const c = typing[i];
+            c.hoverFrom = c.hoverAmt;
+            c.hoverGoal = (single ? -2 - i : c.group) === hoveredGroup ? 1 : 0;
+        }
+    }
+
+    const p = Math.min(1, (now - hoverStart) / HOVER_MS);
+    const e = p * p * (3 - 2 * p);   // smoothstep
+    let moved = false;
+    for (const c of typing) {
+        const amt = c.hoverFrom + (c.hoverGoal - c.hoverFrom) * e;
+        if (amt !== c.hoverAmt) { c.hoverAmt = amt; moved = true; }
+    }
+    if (moved) placeTyping();
 }

@@ -17,6 +17,14 @@ class Char {
         // Frozen at construction, so a letter already flying keeps the size
         // it was born at even if the window resizes mid-flight.
         this.baseSize = bigSize * uiScale;
+        this.hoverAmt = 0;   // 0..1, eased; see updateHover() in typingBuffer.js
+        this.hoverFrom = 0;
+        this.hoverGoal = 0;
+        this.hoverDx = 0;    // horizontal shift from neighbours growing, added at draw time
+    }
+
+    hoverScale() {
+        return 1 + HOVER_BOOST * this.hoverAmt;
     }
 
     setTarget(x, y) {
@@ -57,9 +65,9 @@ class Char {
         // channels the rest of the sketch uses.
         fill(red(displayColor), green(displayColor), blue(displayColor), alpha);
         useFont(this.font);
-        translate(this.pos.x, this.pos.y);
+        translate(this.pos.x + this.hoverDx, this.pos.y);
         rotate(this.rot);
-        textSize(this.baseSize * scale);
+        textSize(this.baseSize * scale * this.hoverScale());
         text(this.character, 0, 0);
         pop();
     }
